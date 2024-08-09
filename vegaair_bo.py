@@ -19,7 +19,7 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.utils.sampling import draw_sobol_samples
 from botorch.acquisition import LogExpectedImprovement
 from botorch.optim import optimize_acqf
-
+from matplotlib import colors as mcolors
 
 def predict() -> np.ndarray:
     # Read the image bytes as an image
@@ -37,12 +37,18 @@ def predict() -> np.ndarray:
     return heatmap
 
 def update_chart(params: list):
-    # params: [aspect_ratio, font_size]
+    # params: [aspect_ratio, font_size, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
-    chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[1]
+    chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = params[1]
+    chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[2]
+    chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = params[3]
+    chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']['test'] = "datum.Entity === 'UK'"
+    chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']['value'] = mcolors.to_hex([params[4], params[5], params[6]])
+
     chart = alt.Chart.from_json(json.dumps(chart_json))
     chart.save('chart.png')
     chart.save('chart.svg')
+    return get_bbox("chart.svg")
 
 def get_bbox(svg_file):
     xmldoc = minidom.parse(svg_file)
@@ -52,7 +58,7 @@ def get_bbox(svg_file):
         if g.getAttribute('class') == "mark-text role-axis-title":
             child = g.firstChild
             if 'rotate(-90)' in child.getAttribute('transform'): # This is the Y-axis label
-                x_offset = float(child.getAttribute('transform')[11:19]) + float(child.getAttribute('font-size')[0:1])
+                x_offset = float(child.getAttribute('transform')[11:19]) + float(child.getAttribute('font-size')[0:1]) # offset caused by axis labels
                 # print(x_offset)
 
     for element in PNT:
@@ -60,9 +66,10 @@ def get_bbox(svg_file):
             path_string = element.getAttribute('d')
             path = parse_path(path_string)
             bbox = path.boundingbox()
-            bbox[0] += x_offset
-            bbox[2] += x_offset
-            # print(bbox)
+            bbox[0] += (x_offset - 20)
+            bbox[1] += (-20)
+            bbox[2] += (x_offset + 20)
+            bbox[3] += (20)
 
     xmldoc.unlink()
     return np.asarray(bbox, dtype=int)
@@ -97,23 +104,21 @@ if __name__ == '__main__':
     # #overlay = cv2.addWeighted(image_np, 1-alpha, heatmap, alpha, 0)
 
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
-    bounds = torch.tensor([[[0.2], [5]],[[2], [25]]], **tkwargs)
+    bounds = torch.tensor([[[0.2], [5], [5], [10], [0], [0], [0]],\
+                           [[2],  [25],[25], [40], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
     x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
     print(bounds)
     y_obs = torch.empty(0,1)
 
     #Initial observations
     for x in x_obs:
-        update_chart(x.tolist())
+        bbox = update_chart(x.tolist())
         heatmap = predict()
-        bbox = get_bbox("chart.svg")
-        print(bbox)
-        print(np.shape(heatmap))
         y_obs = torch.concat([y_obs, torch.tensor([np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])]).unsqueeze(-1)], dim=0)
 
+    y_max = 0
     #Optimization loop
-    for i in range(20):
-        print(x_obs)
+    for i in range(50):
         print(y_obs)
         gp = SingleTaskGP(
             train_X=x_obs,
@@ -125,14 +130,14 @@ if __name__ == '__main__':
         fit_gpytorch_mll(mll)
 
         logNEI = LogExpectedImprovement(model=gp, best_f=y_obs.max())
-
         candidate, acq_value = optimize_acqf(
             logNEI, bounds=bounds.squeeze(-1), q=1, num_restarts=5, raw_samples=20,
         )
-        print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
-
-        update_chart(candidate.tolist()[0])
+        if y_max < y_obs[-1].item():
+            y_max = y_obs[-1].item()
+            print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
+            
+        bbox = update_chart(candidate.tolist()[0])
         heatmap = predict()
-        bbox = get_bbox("chart.svg")
         y_obs = torch.concat([y_obs, torch.tensor([np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
