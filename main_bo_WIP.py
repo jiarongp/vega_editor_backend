@@ -16,7 +16,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],  # Allow requests from all origins, you may want to restrict this
+    allow_origins=["http://localhost","http://localhost:8080"],  # Allow requests from all origins, you may want to restrict this
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
@@ -38,9 +38,16 @@ model.eval()
 colormap = plt.cm.jet
 alpha = 0.5
 
+
+from botorch.models import SingleTaskGP
+from botorch.models.transforms import Normalize, Standardize
+from botorch.fit import fit_gpytorch_mll
+from gpytorch.mlls import ExactMarginalLogLikelihood
+from botorch.utils.sampling import draw_sobol_samples
+
+
 @app.post("/upload")
 async def upload_image(query: QueryData):
-    # try:
     # Extract base64 encoded image data
     base64_data = query.imageDataUrl.split(",")[1]
 
@@ -67,5 +74,16 @@ async def upload_image(query: QueryData):
         image.save(buf, format='PNG')
         im_bytes = buf.getvalue()
 
+    tkwargs = {"device": "cpu:0", "dtype": torch.double}
+    bounds = torch.tensor([[0.1], [2.0]], **tkwargs)
+    x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-2)
+    y_obs = np.mean(heatmap)
+
+
     headers = {'Content-Disposition': 'inline; filename="test.png"'}
-    return Response(im_bytes, headers=headers, media_type='image/png')
+    return Response({"aspect_ratio": 1, im_bytes: im_bytes}, headers=headers, media_type='image/png')
+
+
+@app.get("/")
+async def main():
+    return {"aspect_ratio": 1}
