@@ -36,8 +36,10 @@ def predict() -> np.ndarray:
     heatmap = cv2.resize(heatmap, (image_np.shape[1], image_np.shape[0]))
     return heatmap
 
-def update_chart(aspect_ratio: float):
-    chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * aspect_ratio
+def update_chart(params: list):
+    # params: [aspect_ratio, font_size]
+    chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
+    chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[1]
     chart = alt.Chart.from_json(json.dumps(chart_json))
     chart.save('chart.png')
     chart.save('chart.svg')
@@ -76,7 +78,6 @@ if __name__ == '__main__':
     chart_annotation_json = json.load(f2)
     print(chart_annotation_json['tasks'][0]['question'])
 
-
     device = 'cuda'
     image_processor = AutoImageProcessor.from_pretrained("microsoft/swin-tiny-patch4-window7-224")
     vit = SwinModel.from_pretrained("microsoft/swin-tiny-patch4-window7-224")
@@ -96,21 +97,21 @@ if __name__ == '__main__':
     # #overlay = cv2.addWeighted(image_np, 1-alpha, heatmap, alpha, 0)
 
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
-    bounds = torch.tensor([[0.5], [2.0]], **tkwargs)
+    bounds = torch.tensor([[[0.2], [5]],[[2], [25]]], **tkwargs)
     x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
+    print(bounds)
     y_obs = torch.empty(0,1)
 
-
+    #Initial observations
     for x in x_obs:
-        update_chart(x.item())
+        update_chart(x.tolist())
         heatmap = predict()
         bbox = get_bbox("chart.svg")
         print(bbox)
         print(np.shape(heatmap))
         y_obs = torch.concat([y_obs, torch.tensor([np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])]).unsqueeze(-1)], dim=0)
 
-
-
+    #Optimization loop
     for i in range(20):
         print(x_obs)
         print(y_obs)
@@ -126,11 +127,11 @@ if __name__ == '__main__':
         logNEI = LogExpectedImprovement(model=gp, best_f=y_obs.max())
 
         candidate, acq_value = optimize_acqf(
-            logNEI, bounds=bounds, q=1, num_restarts=5, raw_samples=20,
+            logNEI, bounds=bounds.squeeze(-1), q=1, num_restarts=5, raw_samples=20,
         )
         print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
 
-        update_chart(candidate.tolist()[0][0])
+        update_chart(candidate.tolist()[0])
         heatmap = predict()
         bbox = get_bbox("chart.svg")
         y_obs = torch.concat([y_obs, torch.tensor([np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])]).unsqueeze(-1)], dim=0)
