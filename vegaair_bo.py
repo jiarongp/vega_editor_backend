@@ -37,7 +37,7 @@ def predict() -> np.ndarray:
     return heatmap
 
 def update_chart(params: list):
-    # params: [aspect_ratio, font_size, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
+    # params: [aspect_ratio, font_size_y_label, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
     chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = params[1]
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[2]
@@ -74,8 +74,8 @@ def get_bbox(svg_file):
     xmldoc.unlink()
     return np.asarray(bbox, dtype=int)
 
-def optim_func(heatmap: np.array):
-    return np.mean(heatmap)
+def optim_func(heatmap: np.array, bbox: np.array) -> float:
+    return np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])
 
 
 if __name__ == '__main__':
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     for x in x_obs:
         bbox = update_chart(x.tolist())
         heatmap = predict()
-        y_obs = torch.concat([y_obs, torch.tensor([np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])]).unsqueeze(-1)], dim=0)
+        y_obs = torch.concat([y_obs, torch.tensor([optim_func(heatmap, bbox)]).unsqueeze(-1)], dim=0)
 
     y_max = 0
     #Optimization loop
