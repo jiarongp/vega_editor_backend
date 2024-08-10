@@ -3,3 +3,5 @@ __pycache__/
 *.tar
 chart.png
 chart.svg
+chart_best.png
+chart_best.svg

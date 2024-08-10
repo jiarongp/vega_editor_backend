@@ -1,16 +1,17 @@
+import os, sys
+import argparse
 import altair as alt
 import json
 import torch
 from PIL import Image
 import numpy as np
 import io
-import base64
 from model.model import SalFormer
 from transformers import AutoImageProcessor, AutoTokenizer, BertModel, SwinModel
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
+from matplotlib import colors as mcolors
 import cv2
 from svg.path import parse_path
-from svg.path.path import Line
 from xml.dom import minidom
 from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
@@ -19,24 +20,23 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.utils.sampling import draw_sobol_samples
 from botorch.acquisition import LogExpectedImprovement
 from botorch.optim import optimize_acqf
-from matplotlib import colors as mcolors
 
-def predict() -> np.ndarray:
+def predict(ques: str) -> np.ndarray:
     # Read the image bytes as an image
     image = Image.open('chart.png').convert("RGB")
     img_pt = image_processor(image, return_tensors="pt").to(device)
-    inputs = tokenizer(chart_annotation_json['tasks'][0]['question'], return_tensors="pt").to(device)
+    inputs = tokenizer(ques, return_tensors="pt").to(device)
 
     mask = model(img_pt['pixel_values'], inputs)
     mask = mask.detach().cpu().squeeze().numpy()
-    heatmap = (colormap(mask) * 255).astype(np.uint8)
+    heatmap = (mask * 255).astype(np.uint8)
 
     image_np = np.array(image)
-    image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2RGBA)
+    # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2RGBA)
     heatmap = cv2.resize(heatmap, (image_np.shape[1], image_np.shape[0]))
     return heatmap
 
-def update_chart(params: list):
+def update_chart(params: list, filename: str = 'chart') -> np.ndarray:
     # params: [aspect_ratio, font_size_y_label, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
     chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = params[1]
@@ -46,9 +46,9 @@ def update_chart(params: list):
     chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']['value'] = mcolors.to_hex([params[4], params[5], params[6]])
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
-    chart.save('chart.png')
-    chart.save('chart.svg')
-    return get_bbox("chart.svg")
+    chart.save(f'{filename}.png')
+    chart.save(f'{filename}.svg')
+    return get_bbox(f'{filename}.svg')
 
 def get_bbox(svg_file):
     xmldoc = minidom.parse(svg_file)
@@ -75,13 +75,19 @@ def get_bbox(svg_file):
     return np.asarray(bbox, dtype=int)
 
 def optim_func(heatmap: np.array, bbox: np.array) -> float:
-    return np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])
+    return np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2]])
 
 
 if __name__ == '__main__':
-    f = open('../vega_editor/chartqa_bar20_noq/defaults/4488.json')
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_json", type=str, default="../vega_editor/chartqa_bar20_noq/defaults/4488.json")
+    parser.add_argument("--annot_json", type=str, default="../vega_editor/chartqa_bar20_noq/annotations/4488.json")
+    parser.add_argument('--process_csv', action='store_true')
+    args = vars(parser.parse_args())
+
+    f = open(args['data_json'])
     chart_json = json.load(f)
-    f2 = open('../vega_editor/chartqa_bar20_noq/annotations/4488.json')
+    f2 = open(args['annot_json'])
     chart_annotation_json = json.load(f2)
     print(chart_annotation_json['tasks'][0]['question'])
 
@@ -94,26 +100,17 @@ if __name__ == '__main__':
     checkpoint = torch.load('./model/model_lr6e-5_wd1e-4.tar')
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-    colormap = plt.cm.jet
-    alpha = 0.5
-
-    # image = Image.fromarray(overlay)
-    # with io.BytesIO() as buf:
-    #     image.save(buf, format='PNG')
-    #     im_bytes = buf.getvalue()
-    # #overlay = cv2.addWeighted(image_np, 1-alpha, heatmap, alpha, 0)
 
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
     bounds = torch.tensor([[[0.2], [5], [5], [10], [0], [0], [0]],\
                            [[2],  [25],[25], [40], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
     x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
-    print(bounds)
     y_obs = torch.empty(0,1)
 
     #Initial observations
     for x in x_obs:
         bbox = update_chart(x.tolist())
-        heatmap = predict()
+        heatmap = predict(chart_annotation_json['tasks'][0]['question'])
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(heatmap, bbox)]).unsqueeze(-1)], dim=0)
 
     y_max = 0
@@ -135,9 +132,10 @@ if __name__ == '__main__':
         )
         if y_max < y_obs[-1].item():
             y_max = y_obs[-1].item()
-            print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
-            
+            bbox = update_chart(candidate.tolist()[0], 'chart_best')
+            # print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
+
         bbox = update_chart(candidate.tolist()[0])
-        heatmap = predict()
-        y_obs = torch.concat([y_obs, torch.tensor([np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2], :])]).unsqueeze(-1)], dim=0)
+        heatmap = predict(chart_annotation_json['tasks'][0]['question'])
+        y_obs = torch.concat([y_obs, torch.tensor([optim_func(heatmap, bbox)]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
