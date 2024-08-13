@@ -3,10 +3,12 @@ import argparse
 import json
 from PIL import Image
 import numpy as np
-import io
+from tqdm import trange
+from utils import update_chart_batch
 
 def process_json(input_path, subset, output_path, base_path):
-    for filename in os.listdir(os.path.join(input_path, subset, 'annotations')):
+    for i in trange(len(os.listdir(os.path.join(input_path, subset, 'annotations')))):
+        filename = os.listdir(os.path.join(input_path, subset, 'annotations'))[i]
         if not filename.endswith(".json") or filename.startswith("two_col") or filename.startswith("multi_col"): continue
         f1 = open(os.path.join(input_path, subset, f'{subset}_human.json'))
         ques_json = json.load(f1)
@@ -30,12 +32,13 @@ def process_json(input_path, subset, output_path, base_path):
                 data_entries = []
                 for i, x_label in enumerate(annot_json['models'][0]['x']):
                     data_entries.append({"y": x_label, "x": annot_json['models'][0]['y'][i]})
+                    for j in range(2):
+                        if x_label in annot_json['tasks'][j]['label'] or annot_json['tasks'][j]['label'] in x_label or x_label in annot_json['tasks'][j]['question']:
+                            annot_json['tasks'][j]['entity'] = x_label
+                            annot_json['tasks'][j]['aria-label'] = f"x: {annot_json['models'][0]['y'][i]}; y: {x_label}"
                 output_json['vconcat'][0]['data']['values'] = data_entries
                 output_json['name'] = filename
-                with open(os.path.join(output_path, 'vegas', filename), 'w') as out_file:
-                    json.dump(output_json, out_file)
-                with open(os.path.join(output_path, 'annotations', filename), 'w') as out_file:
-                    json.dump(annot_json, out_file)
+                update_chart_batch(output_json, annot_json, output_path, filename.strip('.json'))
         elif annot_json['type'] == 'v_bar':
             base_json = os.path.join(base_path, 'vbar_template.json')
             f = open(base_json)
@@ -45,12 +48,13 @@ def process_json(input_path, subset, output_path, base_path):
                 data_entries = []
                 for i, x_label in enumerate(annot_json['models'][0]['x']):
                     data_entries.append({"x": x_label, "y": annot_json['models'][0]['y'][i]})
+                    for j in range(2):
+                        if x_label in annot_json['tasks'][j]['label'] or annot_json['tasks'][j]['label'] in x_label or x_label in annot_json['tasks'][j]['question']:
+                            annot_json['tasks'][j]['entity'] = x_label
+                            annot_json['tasks'][j]['aria-label'] = f"x: {x_label}; y: {annot_json['models'][0]['y'][i]}"
                 output_json['vconcat'][0]['data']['values'] = data_entries
                 output_json['name'] = filename
-                with open(os.path.join(output_path, 'vegas', filename), 'w') as out_file:
-                    json.dump(output_json, out_file)
-                with open(os.path.join(output_path, 'annotations', filename), 'w') as out_file:
-                    json.dump(annot_json, out_file)
+                update_chart_batch(output_json, annot_json, output_path, filename.strip('.json'))
 
 
 

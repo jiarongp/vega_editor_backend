@@ -1,4 +1,5 @@
 import json
+import os
 import numpy as np
 import altair as alt
 from matplotlib import colors as mcolors
@@ -19,6 +20,15 @@ def update_chart(chart_json: json, params: list, annotation: json, filename: str
     chart.save(f'{filename}.svg')
     return get_bbox(f'{filename}.svg', annotation)
 
+def update_chart_batch(chart_json: json, annotation: json, output_path: str, filename: str = 'chart'):
+    #chart = alt.Chart.from_json(json.dumps(chart_json))
+    #chart.save(os.path.join(output_path, 'svgs', f'{filename}.svg'))
+    with open(os.path.join(output_path, 'vegas', f'{filename}.json'), 'w') as out_file:
+        json.dump(chart_json, out_file)
+    with open(os.path.join(output_path, 'annotations', f'{filename}.json'), 'w') as out_file:
+        json.dump(annotation, out_file)
+    #return get_bbox(f'{filename}.svg', annotation)
+
 def get_bbox(svg_file, annotation:json) -> np.ndarray:
     xmldoc = minidom.parse(svg_file)
     PNT = xmldoc.getElementsByTagName("path")
@@ -28,7 +38,7 @@ def get_bbox(svg_file, annotation:json) -> np.ndarray:
             child = g.firstChild
             if 'rotate(-90)' in child.getAttribute('transform'): # This is the Y-axis label
                 # print(child.getAttribute('transform'))
-                x_offset = float(child.getAttribute('transform')[11:19]) + float(child.getAttribute('font-size')[0:1]) # offset caused by axis labels
+                x_offset = float(child.getAttribute('transform').strip('translate(-').split(',')[0]) + float(child.getAttribute('font-size')[0:1]) # offset caused by axis labels
                 # print(x_offset)
 
     for element in PNT:
