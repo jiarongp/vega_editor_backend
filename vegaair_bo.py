@@ -4,9 +4,9 @@ import json
 import torch
 from PIL import Image
 import numpy as np
+from typing import List
 from model.model import SalFormer
 from transformers import AutoImageProcessor, AutoTokenizer, BertModel, SwinModel
-#import matplotlib.pyplot as plt
 import cv2
 from botorch.models import SingleTaskGP
 from botorch.models.transforms import Normalize, Standardize
@@ -16,9 +16,19 @@ from botorch.utils.sampling import draw_sobol_samples
 from botorch.acquisition import LogExpectedImprovement
 from botorch.optim import optimize_acqf
 from utils import update_chart
+from metrics import wave_metric
 
-def predict(ques: str) -> np.ndarray:
-    # Read the image bytes as an image
+def predict(ques: str) -> List:
+    """
+    Execute the prediction.
+
+    Args:
+        ques: a question string to feed into VisSalFormer
+
+    Returns: [list]
+        - heatmap from VisSalFormer (np.array)
+        - Average WAVE score across pixels (float, [0, 1))
+    """
     image = Image.open('chart.png').convert("RGB")
     img_pt = image_processor(image, return_tensors="pt").to(device)
     inputs = tokenizer(ques, return_tensors="pt").to(device)
@@ -30,10 +40,23 @@ def predict(ques: str) -> np.ndarray:
     image_np = np.array(image)
     # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2RGBA)
     heatmap = cv2.resize(heatmap, (image_np.shape[1], image_np.shape[0]))
-    return heatmap
+    return [heatmap, wave_metric(image)]
 
-def optim_func(heatmap: np.array, bbox: np.array) -> float:
-    return np.mean(heatmap[bbox[1]:bbox[3], bbox[0]:bbox[2]])
+def optim_func(predictions: List, bbox: np.array) -> float:
+    """
+    Optimisation function of BO.
+
+    Args:
+        predictions[list]: same as the output of predict()
+        bbox: bounding box coordinates
+
+    Returns: score of the optimisation function
+        
+    """
+    WAVE = predictions[1] * 255.
+    bbox_heatmap = np.mean(predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]])
+
+    return np.mean(0.2 * WAVE + 0.8 * bbox_heatmap)
 
 def bayesian_optim(chart_json: json, annotation:json):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
@@ -45,8 +68,8 @@ def bayesian_optim(chart_json: json, annotation:json):
     #Initial observations
     for x in x_obs:
         bbox = update_chart(chart_json, x.tolist(), annotation)
-        heatmap = predict(annotation['question'])
-        y_obs = torch.concat([y_obs, torch.tensor([optim_func(heatmap, bbox)]).unsqueeze(-1)], dim=0)
+        predictions = predict(annotation['question'])
+        y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bbox)]).unsqueeze(-1)], dim=0)
 
     y_max = 0
     #Optimization loop
@@ -71,8 +94,8 @@ def bayesian_optim(chart_json: json, annotation:json):
             # print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
 
         bbox = update_chart(chart_json, candidate.tolist()[0], annotation)
-        heatmap = predict(annotation['question'])
-        y_obs = torch.concat([y_obs, torch.tensor([optim_func(heatmap, bbox)]).unsqueeze(-1)], dim=0)
+        predictions = predict(annotation['question'])
+        y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bbox)]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
 
 
