@@ -1,0 +1,74 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {"view": {"continuousWidth": 400}},
+  "vconcat": [
+    {
+      "width": 400,
+      "height": 285.7142857142857,
+      "title": {
+        "text": "",
+        "anchor": "start"
+      },
+      "data": {
+        "values": []
+      },
+      "encoding": {
+        "y": {
+          "field": "value",
+          "type": "quantitative",
+          "axis": null
+        },
+        "x": {
+          "field": "Entity",
+          "type": "ordinal",
+          "axis": {"grid": false, "labelFontSize": 17}
+        },
+        "opacity": {"value": 1}
+      },
+      "layer": [
+        {
+          "mark": {"type": "bar"},
+          "encoding": {
+            "color": {
+              "condition":
+                {"test": "datum.y === 'none'", "value": "#d8a27d"}
+              ,
+              "value": "#949d48"
+            },
+            "opacity": {
+              "condition": {"test": "datum.y === 'none'", "value": 1},
+              "value": 1
+            },
+            "size": {
+              "condition": {"test": "datum.y === 'none'", "value": 30},
+              "value": 40
+            }
+          }
+        },
+        {
+          "mark": {
+            "type": "text",
+            "dx": 16,
+            "dy": 0,
+            "xOffset": 10,
+            "yOffset": 0,
+            "angle": 0,
+            "align": "right",
+            "baseline": "middle",
+            "font": "serif",
+            "fontSize": 24,
+            "fontStyle": "italic",
+            "fontWeight": "normal",
+            "opacity": 1
+          },
+          "encoding": {
+            "text": {"field": "value", "type": "quantitative"},
+            "color": {"value": "#000000"},
+            "y": {"field": "value", "type": "quantitative"}
+          }
+        }
+      ]
+    }
+  ],
+  "name": "template"
+}

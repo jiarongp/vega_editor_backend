@@ -18,13 +18,13 @@ def update_chart(chart_json: json, params: list, annotation: json, filename: str
     chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']['value'] = mcolors.to_hex([params[4], params[5], params[6]])
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
-    chart.save(f'{filename}.png')
-    chart.save(f'{filename}.svg')
-    bbox = get_bbox(f'{filename}.svg', annotation)
-    im = Image.open(f'{filename}.png').convert("RGB")
+    chart.save(f'data/{filename}.png')
+    chart.save(f'data/{filename}.svg')
+    bbox = get_bbox(f'data/{filename}.svg', annotation)
+    im = Image.open(f'data/{filename}.png').convert("RGB")
     im = np.array(im)
     cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0),2)
-    cv2.imwrite(f'{filename}_bbox.png', im)
+    cv2.imwrite(f'data/{filename}_bbox.png', im)
     return bbox
 
 def save_chart_batch(chart_json: json, annotation: json, output_path: str, filename: str = 'chart'):
@@ -34,7 +34,7 @@ def save_chart_batch(chart_json: json, annotation: json, output_path: str, filen
         json.dump(chart_json, out_file)
     with open(os.path.join(output_path, 'annotations', f'{filename}.json'), 'w') as out_file:
         json.dump(annotation, out_file)
-    #return get_bbox(f'{filename}.svg', annotation)
+    #return get_bbox(f'data/{filename}.svg', annotation)
 
 def get_bbox(svg_file, annotation:json) -> np.ndarray:
     xmldoc = minidom.parse(svg_file)

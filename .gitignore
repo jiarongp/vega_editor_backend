@@ -1,7 +1,9 @@
 __pycache__/
 .DS_Store
 *.tar
-chart.png
-chart.svg
-chart_best.png
-chart_best.svg
+data/chart.png
+data/chart.svg
+data/chart_best.png
+data/chart_best.svg
+data/chart_bbox.png
+data/chart_best_bbox.png

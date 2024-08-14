@@ -29,7 +29,7 @@ def predict(ques: str) -> List:
         - heatmap from VisSalFormer (np.array)
         - Average WAVE score across pixels (float, [0, 1))
     """
-    image = Image.open('chart.png').convert("RGB")
+    image = Image.open('data/chart.png').convert("RGB")
     img_pt = image_processor(image, return_tensors="pt").to(device)
     inputs = tokenizer(ques, return_tensors="pt").to(device)
 

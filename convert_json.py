@@ -67,7 +67,7 @@ if __name__ == '__main__':
     parser.add_argument("--chartqa_path", type=str, default="/netpool/homes/wangyo/Dataset/ChartQA/")
     parser.add_argument("--subset", type=str, default="train")
     parser.add_argument("--output_path", type=str, default="/netpool/homes/wangyo/Dataset/ChartQA_VegaAltAir")
-    parser.add_argument("--base_path", type=str, default="/netpool/homes/wangyo/Projects/vega_editor/chartqa_bar20_noq/defaults")
+    parser.add_argument("--base_path", type=str, default="./data")
     args = vars(parser.parse_args())
 
     process_json(args['chartqa_path'], args['subset'], args['output_path'], args['base_path'])
