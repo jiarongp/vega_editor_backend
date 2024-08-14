@@ -2,7 +2,6 @@ import os, sys
 import argparse
 import json
 import re
-from PIL import Image
 import numpy as np
 from tqdm import trange
 from utils import save_chart_batch

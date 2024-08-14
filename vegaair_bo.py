@@ -68,7 +68,7 @@ def bayesian_optim(chart_json: json, annotation:json):
     #Initial observations
     for x in x_obs:
         bbox = update_chart(chart_json, x.tolist(), annotation)
-        predictions = predict(annotation['question'])
+        predictions = predict(annotation['tasks'][0]['question'])
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bbox)]).unsqueeze(-1)], dim=0)
 
     y_max = 0
@@ -94,7 +94,7 @@ def bayesian_optim(chart_json: json, annotation:json):
             # print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
 
         bbox = update_chart(chart_json, candidate.tolist()[0], annotation)
-        predictions = predict(annotation['question'])
+        predictions = predict(annotation['tasks'][0]['question'])
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bbox)]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
 
@@ -121,4 +121,4 @@ if __name__ == '__main__':
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     
-    bayesian_optim(chart_json, chart_annotation_json['tasks'][1])
+    bayesian_optim(chart_json, chart_annotation_json)
