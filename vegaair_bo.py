@@ -17,6 +17,8 @@ from botorch.acquisition import LogExpectedImprovement
 from botorch.optim import optimize_acqf
 from utils import update_chart
 from metrics import wave_metric
+torch.manual_seed(42)
+
 
 def predict(ques: str) -> List:
     """
@@ -42,7 +44,7 @@ def predict(ques: str) -> List:
     heatmap = cv2.resize(heatmap, (image_np.shape[1], image_np.shape[0]))
     return [heatmap, wave_metric(image)]
 
-def optim_func(predictions: List, bbox: np.array) -> float:
+def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
     """
     Optimisation function of BO.
 
@@ -51,12 +53,13 @@ def optim_func(predictions: List, bbox: np.array) -> float:
         bbox: bounding box coordinates
 
     Returns: score of the optimisation function
-        
     """
     WAVE = predictions[1] * 255.
-    bbox_heatmap = np.mean(predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]])
+    bbox_heatmap = 0
+    for bbox in bboxes:
+        bbox_heatmap += np.mean(predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]])
 
-    return np.mean(0.2 * WAVE + 0.8 * bbox_heatmap)
+    return np.mean(0.2 * WAVE + 0.8 * bbox_heatmap / len(bboxes))
 
 def bayesian_optim(chart_json: json, annotation:json):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
@@ -68,7 +71,7 @@ def bayesian_optim(chart_json: json, annotation:json):
     #Initial observations
     for x in x_obs:
         bbox = update_chart(chart_json, x.tolist(), annotation)
-        predictions = predict(annotation['tasks'][0]['question'])
+        predictions = predict(annotation['tasks'][1]['question'])
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bbox)]).unsqueeze(-1)], dim=0)
 
     y_max = 0
@@ -94,7 +97,7 @@ def bayesian_optim(chart_json: json, annotation:json):
             # print(candidate)  # tensor([[0.2981, 0.2401]], dtype=torch.float64)
 
         bbox = update_chart(chart_json, candidate.tolist()[0], annotation)
-        predictions = predict(annotation['tasks'][0]['question'])
+        predictions = predict(annotation['tasks'][1]['question'])
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bbox)]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
 
