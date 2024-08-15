@@ -1,0 +1,114 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
+  "config": {"view": {"continuousWidth": 400}},
+  "vconcat": [
+    {
+      "width": 400,
+      "height": 285.7142857142857,
+      "title": {
+        "text": "Consensus that China plays a bigger role in the world today",
+        "subtitle": "% who say plays a more important role in the world than it did 10 years ago",
+        "anchor": "start"
+      },
+      "data": {
+        "values": [
+          {"Entity": "UK", "Importance": 21},
+          {"Entity": "France", "Importance": 22},
+          {"Entity": "India", "Importance": 27},
+          {"Entity": "U.S.", "Importance": 31},
+          {"Entity": "Germany", "Importance": 35},
+          {"Entity": "Russia", "Importance": 42},
+          {"Entity": "China", "Importance": 70}
+        ]
+      },
+      "encoding": {
+        "y": {
+          "field": "Entity",
+          "type": "ordinal",
+          "axis": {"grid": false, "labelFontSize": 17},
+          "sort": [
+            "China",
+            "Russia",
+            "Germany",
+            "U.S.",
+            "India",
+            "France",
+            "UK"
+          ]
+        },
+        "x": {
+          "field": "Importance",
+          "type": "quantitative",
+          "axis": {"grid": false, "tickCount": 5, "labelFontSize": 17},
+          "scale": {"domain": [0, 100]}
+        },
+        "opacity": {"value": 1}
+      },
+      "layer": [
+        {
+          "mark": {"type": "bar"},
+          "encoding": {
+            "color": {
+              "condition":
+              {"test": "datum.Entity === 'none'", "value": "#949d48"},
+              "value": "#949d48"
+            },
+            "opacity": {
+              "condition": {"test": "datum.Entity === 'none'", "value": 1},
+              "value": 1
+            },
+            "size": {
+              "condition": {"test": "datum.Entity === 'none'", "value": 30},
+              "value": 40
+            }
+          }
+        },
+        {
+          "mark": {
+            "type": "text",
+            "dx": 16,
+            "dy": 0,
+            "xOffset": 10,
+            "yOffset": 0,
+            "angle": 0,
+            "align": "right",
+            "baseline": "middle",
+            "font": "serif",
+            "fontSize": 24,
+            "fontStyle": "italic",
+            "fontWeight": "normal",
+            "opacity": 1
+          },
+          "encoding": {
+            "text": {"field": "Importance", "type": "quantitative"},
+            "color": {"value": "#000000"},
+            "x": {"field": "Importance", "type": "quantitative"}
+          }
+        }
+      ]
+    },
+    {
+      "width": 400,
+      "height": 10,
+      "data": {
+        "values": [
+          {"text": "Note: Percentages are medians based on 25 countries."}
+        ]
+      },
+      "mark": {"type": "text", "align": "left", "baseline": "middle"},
+      "encoding": {"text": {"field": "text"}}
+    },
+    {
+      "width": 400,
+      "height": 10,
+      "data": {
+        "values": [
+          {"text": "Source: Spring 2018 Global Attitudes Survey. Q31 & Q32a-f."}
+        ]
+      },
+      "mark": {"type": "text", "align": "left", "baseline": "middle"},
+      "encoding": {"text": {"field": "text"}}
+    }
+  ],
+  "name": "4488"
+}
