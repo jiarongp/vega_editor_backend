@@ -14,7 +14,7 @@ def update_chart(chart_json: json, params: list, annotation: json, data_path: st
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[2]
     chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = params[3]
-    for i, entity in enumerate(annotation['tasks'][1]['entity']):
+    for _, entity in enumerate(annotation['tasks'][1]['entity']):
         f = False
         for dd in chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']:
             if dd['test'] == f"datum.Entity === '{entity}'":
