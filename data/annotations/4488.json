@@ -125,13 +125,13 @@
       "question": "Which country plays the least important role in the world than it did 10 years ago?",
       "label": "UK",
       "entity": ["UK"],
-      "aria-label": ["Importance: 21; Entity: UK"]
+      "aria-label": ["value: 21; Entity: UK"]
     },
     {
       "question": "What is the sum of the least and highest value in the graph?",
       "label": "0.91",
       "entity": ["UK", "China"],
-      "aria-label": ["Importance: 21; Entity: UK", "Importance: 70; Entity: China"]
+      "aria-label": ["value: 21; Entity: UK", "value: 70; Entity: China"]
     }
     ]
 }

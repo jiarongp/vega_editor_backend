@@ -9,34 +9,37 @@ import cv2
 from typing import List
 from PIL import Image
 
-def update_chart(chart_json: json, params: list, annotation: json, filename: str = 'chart') -> np.ndarray:
+def update_chart(chart_json: json, params: list, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
     # params: [aspect_ratio, font_size_y_label, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[2]
     chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = params[3]
     for i, entity in enumerate(annotation['tasks'][1]['entity']):
+        f = False
+        for dd in chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']:
+            if dd['test'] == f"datum.Entity === '{entity}'":
+                dd['value'] = mcolors.to_hex([params[4], params[5], params[6]])
+                f = True
+                break
+        if f: continue
         chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition'].append({
             "test": f"datum.Entity === '{entity}'",
             "value": mcolors.to_hex([params[4], params[5], params[6]])
         })
-        # print({
-        #     "test": f"datum.Entity === '{entity}'",
-        #     "value": mcolors.to_hex([params[4], params[5], params[6]])
-        # })
     if annotation['type'] == 'h_bar':
         chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = params[1]
     elif annotation['type'] == 'v_bar':
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = params[1]
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
-    chart.save(f'data/{filename}.png')
-    chart.save(f'data/{filename}.svg')
-    im = Image.open(f'data/{filename}.png').convert("RGB")
+    chart.save(f'{data_path}/{filename}.png')
+    chart.save(f'{data_path}/{filename}.svg')
+    im = Image.open(f'{data_path}/{filename}.png').convert("RGB")
     im = np.array(im)
-    bboxes = get_bboxes(f'data/{filename}.svg', annotation, np.shape(im))
+    bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im))
     for bbox in bboxes:
         cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0),2)
-        cv2.imwrite(f'data/{filename}_bbox.png', im)
+        cv2.imwrite(f'{data_path}/{filename}_bbox.png', im)
     return bboxes
 
 def save_chart_batch(chart_json: json, annotation: json, output_path: str, filename: str = 'chart'):
@@ -70,10 +73,10 @@ def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarra
                 path_string = element.getAttribute('d')
                 path = parse_path(path_string)
                 bbox = path.boundingbox()
-                bbox[0] += (x_offset - 30) # making bounding box bigger
+                bbox[0] += (x_offset - 50) # making bounding box bigger
                 bbox[1] += (0)
                 bbox[2] += (x_offset + 50)
-                bbox[3] += (40)
+                bbox[3] += (50)
                 if bbox[0] < 0: bbox[0] = 0
                 if bbox[1] < 0: bbox[1] = 0
                 if bbox[2] > imshape[1]: bbox[2] = imshape[1] - 1

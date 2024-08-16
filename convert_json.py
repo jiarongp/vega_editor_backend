@@ -23,7 +23,7 @@ def process_json(input_path, subset, output_path, base_path):
         annot_json = json.load(f2)
         annot_json['tasks'] = []
         for q in questions:
-            annot_json['tasks'].append({"question": q['query'], "label": q['label'], "entity": '', "aria-label": ''})
+            annot_json['tasks'].append({"question": q['query'], "label": q['label'], "entity": [], "aria-label": []})
         if annot_json['type'] == 'h_bar':
             output_json = load_base_json(os.path.join(base_path, 'hbar_template.json'))
             # if 'title' in annot_json['general_figure_info'].keys():
@@ -37,9 +37,9 @@ def process_json(input_path, subset, output_path, base_path):
                     data_entries.append({"Entity": x_label, "value": value})
                     for j in range(2):
                         if x_label in annot_json['tasks'][j]['label'] or annot_json['tasks'][j]['label'] in x_label or x_label in annot_json['tasks'][j]['question']:
-                            annot_json['tasks'][j]['entity'] = x_label
-                            annot_json['tasks'][j]['aria-label'] = f"value: {value}; Entity: {x_label}"
-                if annot_json['tasks'][0]['entity'] or annot_json['tasks'][1]['entity']:
+                            annot_json['tasks'][j]['entity'].append(x_label)
+                            annot_json['tasks'][j]['aria-label'].append(f"value: {value}; Entity: {x_label}")
+                if annot_json['tasks'][1]['entity']: # save if the second task has entities
                     output_json['vconcat'][0]['data']['values'] = data_entries
                     output_json['name'] = filename
                     save_chart_batch(output_json, annot_json, output_path, filename.strip('.json'))
@@ -52,9 +52,9 @@ def process_json(input_path, subset, output_path, base_path):
                     data_entries.append({"Entity": x_label, "value": value})
                     for j in range(2):
                         if x_label in annot_json['tasks'][j]['label'] or annot_json['tasks'][j]['label'] in x_label or x_label in annot_json['tasks'][j]['question']:
-                            annot_json['tasks'][j]['entity'] = x_label
-                            annot_json['tasks'][j]['aria-label'] = f"Entity: {x_label}; value: {value}"
-                if annot_json['tasks'][0]['entity'] or annot_json['tasks'][1]['entity']:
+                            annot_json['tasks'][j]['entity'].append(x_label)
+                            annot_json['tasks'][j]['aria-label'].append(f"Entity: {x_label}; value: {value}")
+                if annot_json['tasks'][1]['entity']: # save if the second task has entities
                     output_json['vconcat'][0]['data']['values'] = data_entries
                     output_json['name'] = filename
                     save_chart_batch(output_json, annot_json, output_path, filename.strip('.json'))

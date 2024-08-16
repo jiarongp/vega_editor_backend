@@ -12,13 +12,13 @@
       },
       "data": {
         "values": [
-          {"Entity": "UK", "Importance": 21},
-          {"Entity": "France", "Importance": 22},
-          {"Entity": "India", "Importance": 27},
-          {"Entity": "U.S.", "Importance": 31},
-          {"Entity": "Germany", "Importance": 35},
-          {"Entity": "Russia", "Importance": 42},
-          {"Entity": "China", "Importance": 70}
+          {"Entity": "UK", "value": 21},
+          {"Entity": "France", "value": 22},
+          {"Entity": "India", "value": 27},
+          {"Entity": "U.S.", "value": 31},
+          {"Entity": "Germany", "value": 35},
+          {"Entity": "Russia", "value": 42},
+          {"Entity": "China", "value": 70}
         ]
       },
       "encoding": {
@@ -37,7 +37,7 @@
           ]
         },
         "x": {
-          "field": "Importance",
+          "field": "value",
           "type": "quantitative",
           "axis": {"grid": false, "tickCount": 5, "labelFontSize": 17},
           "scale": {"domain": [0, 100]}
@@ -50,16 +50,15 @@
           "encoding": {
             "color": {
               "condition":
-                []
-              ,
+              {"test": "datum.Entity === 'none'", "value": "#949d48"},
               "value": "#949d48"
             },
             "opacity": {
-              "condition": [{"test": "datum.Entity === 'none'", "value": 1}],
+              "condition": {"test": "datum.Entity === 'none'", "value": 1},
               "value": 1
             },
             "size": {
-              "condition": [{"test": "datum.Entity === 'none'", "value": 30}],
+              "condition": {"test": "datum.Entity === 'none'", "value": 30},
               "value": 40
             }
           }
@@ -69,7 +68,7 @@
             "type": "text",
             "dx": 16,
             "dy": 0,
-            "xOffset": 10,
+            "xOffset": 16,
             "yOffset": 0,
             "angle": 0,
             "align": "right",
@@ -81,9 +80,9 @@
             "opacity": 1
           },
           "encoding": {
-            "text": {"field": "Importance", "type": "quantitative"},
+            "text": {"field": "value", "type": "quantitative"},
             "color": {"value": "#000000"},
-            "x": {"field": "Importance", "type": "quantitative"}
+            "x": {"field": "value", "type": "quantitative"}
           }
         }
       ]
