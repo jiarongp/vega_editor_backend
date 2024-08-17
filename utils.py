@@ -10,11 +10,12 @@ from typing import List
 from PIL import Image
 
 def update_chart(chart_json: json, params: list, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
+    print(filename)
     # params: [aspect_ratio, font_size_y_label, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[2]
     chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = params[3]
-    for _, entity in enumerate(annotation['tasks'][1]['entity']):
+    for _, entity in enumerate(annotation['tasks'][0]['entity']):
         f = False
         for dd in chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']:
             if dd['test'] == f"datum.Entity === '{entity}'":
@@ -67,7 +68,7 @@ def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarra
                 break
 
     bboxes = []
-    for ariaLabel in annotation['tasks'][1]['aria-label']:
+    for ariaLabel in annotation['tasks'][0]['aria-label']:
         for element in PNT:
             if element.getAttribute('aria-label') == ariaLabel:
                 path_string = element.getAttribute('d')

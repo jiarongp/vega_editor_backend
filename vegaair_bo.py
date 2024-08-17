@@ -65,8 +65,7 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
 
     return np.mean(0.5 * WAVE + 0.5 * heatmap_mean / len(bboxes))
 
-def bayesian_optim(chart_json: json, annotation:json, optim_path: str, chart_name:str):
-    print(chart_json)
+def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
     bounds = torch.tensor([[[0.2], [8], [8], [10], [0], [0], [0]],\
                            [[2],  [30],[30], [60], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
@@ -76,13 +75,13 @@ def bayesian_optim(chart_json: json, annotation:json, optim_path: str, chart_nam
     #Initial observations
     for x in x_obs:
         bboxes = update_chart(chart_json, x.tolist(), annotation)
-        predictions = predict(annotation['tasks'][1]['question'])
+        predictions = predict(query)
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
 
-    print(y_obs, x_obs)
+    #print(y_obs, x_obs)
     y_max = 0
-    #Optimization loop
-    for i in trange(50):
+    # FIXME:Optimization loop, set to 1 for debug
+    for i in trange(1):
         gp = SingleTaskGP(
             train_X=x_obs,
             train_Y=y_obs,
@@ -101,17 +100,16 @@ def bayesian_optim(chart_json: json, annotation:json, optim_path: str, chart_nam
             update_chart(chart_json, candidate.tolist()[0], annotation, optim_path, chart_name)
 
         bboxes = update_chart(chart_json, candidate.tolist()[0], annotation)
-        predictions = predict(annotation['tasks'][1]['question'])
+        predictions = predict(query)
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
 
 
 def load_json(data_path: str, annot_path: str) -> List:
     f = open(data_path)
-    chart_json = json.load(f)
     f2 = open(annot_path)
-    annot_json = json.load(f2)
-    return chart_json, annot_json
+    # chart, annot
+    return json.load(f), json.load(f2)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -132,8 +130,8 @@ if __name__ == '__main__':
 
     if '.json' in args['data_path']:
         chart_json, annot_json = load_json(args['data_path'], args['annot_path'])
-        bayesian_optim(chart_json, annot_json, optim_path=args['optim_path'], chart_name=args['data_path'].split('/')[-1].strip('.json'))
+        bayesian_optim(chart_json, annot_json, query=annot_json['tasks'][0]['question'], optim_path=args['optim_path'], chart_name=args['data_path'].split('/')[-1].strip('.json'))
     else: # batch processing
         for data_json in os.listdir(args['data_path']):
             chart_json, annot_json = load_json(os.path.join(args['data_path'], data_json), os.path.join(args['annot_path'], data_json))
-            bayesian_optim(chart_json, annot_json, optim_path=args['optim_path'], chart_name=data_json.strip('.json'))        
+            bayesian_optim(chart_json, annot_json, query=annot_json['tasks'][0]['question'], optim_path=args['optim_path'], chart_name=data_json.strip('.json'))        
