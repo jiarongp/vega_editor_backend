@@ -10,7 +10,6 @@ from typing import List
 from PIL import Image
 
 def update_chart(chart_json: json, params: list, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
-    print(filename)
     # params: [aspect_ratio, font_size_y_label, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * params[0]
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = params[2]
@@ -33,11 +32,13 @@ def update_chart(chart_json: json, params: list, annotation: json, data_path: st
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = params[1]
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
+    # print(chart_json['name'])
     chart.save(f'{data_path}/{filename}.png')
     chart.save(f'{data_path}/{filename}.svg')
     im = Image.open(f'{data_path}/{filename}.png').convert("RGB")
     im = np.array(im)
     bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im))
+
     for bbox in bboxes:
         cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0),2)
         cv2.imwrite(f'{data_path}/{filename}_bbox.png', im)

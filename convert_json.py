@@ -5,6 +5,7 @@ import re
 from typing import List
 from tqdm import trange
 from utils import save_chart_batch
+from decimal import Decimal
 
 def load_base_json(base_json):
     f = open(base_json)
@@ -37,23 +38,36 @@ def write_tasks(annot_json:json, questions:List, base_path:str, output_path:str,
                 lowest_value = 100000000
                 highest_label = ''
                 highest_value = -1
-                for i, x_label in enumerate(annot_json['models'][0]['x']):
+                for i, x_l in enumerate(annot_json['models'][0]['x']):
                     value = re.sub('[^0-9.]','', annot_json['models'][0]['y'][i])
-                    data_entries.append({"Entity": x_label, "value": value})
+                    try:
+                        float(value)
+                    except ValueError:
+                        continue
+                    x_label = x_l.replace("'", "")
+                    if not value: continue
+
+                    value = str(Decimal(value)).replace('.0','')
+                    if value.find('0.') > -1:
+                        if len(value) - value.find('.') > 2:
+                            value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
+                    elif value.find('.') > -1:
+                        if len(value) - value.find('.') > 1:
+                            value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
+                    data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
                     if x_label.lower() in q_label.lower() or q_label.lower() in x_label.lower() or x_label.lower() in q['query'].lower():
                         entities.append(x_label)
                         if v_type == 'h_bar':
-                            ariaLabels.append(f"value: {value}; Entity: {x_label}")
+                            ariaLabels.append(f"value: {str(Decimal(value)).replace('.0','')}; Entity: {x_label}")
                         elif v_type == 'v_bar':
-                            ariaLabels.append(f"Entity: {x_label}; value: {value}")
+                            ariaLabels.append(f"Entity: {x_label}; value: {str(Decimal(value)).replace('.0','')}")
 
-                    if not value.isnumeric(): continue
-                    if float(value) < lowest_value:
+                    if float(value) < float(lowest_value):
                         lowest_label = x_label
-                        lowest_value = float(value)
-                    if float(value) > highest_value:
+                        lowest_value = value
+                    if float(value) > float(highest_value):
                         highest_label = x_label
-                        highest_value = float(value)
+                        highest_value = value
                 if lowest_label and ('least' in q['query'].lower() or 'lowest' in q['query'].lower()):
                     entities.append(lowest_label)
                     if v_type == 'h_bar':

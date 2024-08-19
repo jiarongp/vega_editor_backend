@@ -69,19 +69,22 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
     bounds = torch.tensor([[[0.2], [8], [8], [10], [0], [0], [0]],\
                            [[2],  [30],[30], [60], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
-    x_obs = draw_sobol_samples(bounds=bounds, n=8, q=1, seed=0).squeeze(-1)
+    x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
     y_obs = torch.empty(0,1)
 
     #Initial observations
     for x in x_obs:
         bboxes = update_chart(chart_json, x.tolist(), annotation)
+        if len(bboxes) == 0:
+            print('no valid bounding boxes found')
+            return
         predictions = predict(query)
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
 
     #print(y_obs, x_obs)
     y_max = 0
-    # FIXME:Optimization loop, set to 1 for debug
-    for i in trange(1):
+    # Optimization loop
+    for i in trange(50):
         gp = SingleTaskGP(
             train_X=x_obs,
             train_Y=y_obs,
