@@ -75,7 +75,7 @@ def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarra
                 path_string = element.getAttribute('d')
                 path = parse_path(path_string)
                 bbox = path.boundingbox()
-                bbox[0] += (x_offset - 50) # making bounding box bigger
+                bbox[0] += (x_offset - 80) # making bounding box bigger
                 bbox[1] += (0)
                 bbox[2] += (x_offset + 50)
                 bbox[3] += (50)

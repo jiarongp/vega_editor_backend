@@ -38,11 +38,12 @@ def predict(ques: str) -> List:
     mask = model(img_pt['pixel_values'], inputs)
     mask = mask.detach().cpu().squeeze().numpy()
     heatmap = (mask * 255).astype(np.uint8)
+    gary_image = image.convert('L')
 
-    image_np = np.array(image)
+    # image_np = np.array(image)
     # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2RGBA)
-    heatmap = cv2.resize(heatmap, (image_np.shape[1], image_np.shape[0]))
-    return [heatmap, wave_metric(image)]
+    heatmap = cv2.resize(heatmap, (image.size[1], image.size[0]))
+    return [heatmap, image, np.array(gary_image)]
 
 def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
     """
@@ -55,15 +56,16 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
     Returns: score of the optimisation function
     """
     # WAVE is a metric that measures how close the colors in the heatmap are to the preferred colors from human [0, 1]
-    WAVE = predictions[1] * 255.
+    WAVE = wave_metric(predictions[1]) * 255.
+    # Visual Density is a metric that measures the area of inks used in the chart [0, 1]
+    VD = predictions[2][predictions[2]>253].size / predictions[2].size
     # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 32, which thresholds the whitespaces out)
     heatmap_mean = 0
     for bbox in bboxes:
         bbox_heapmap = predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]]
         if bbox_heapmap[bbox_heapmap>8].size > 0:
             heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
-
-    return np.mean(0.5 * WAVE + 0.5 * heatmap_mean / len(bboxes))
+    return np.mean(WAVE + 2 * heatmap_mean / len(bboxes) - 256 * np.abs(VD - 0.596)) # 0.596 is the average VD of ChartQA
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
@@ -84,7 +86,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     #print(y_obs, x_obs)
     y_max = 0
     # Optimization loop
-    for i in trange(50):
+    for i in trange(20):
         gp = SingleTaskGP(
             train_X=x_obs,
             train_Y=y_obs,
@@ -137,4 +139,4 @@ if __name__ == '__main__':
     else: # batch processing
         for data_json in os.listdir(args['data_path']):
             chart_json, annot_json = load_json(os.path.join(args['data_path'], data_json), os.path.join(args['annot_path'], data_json))
-            bayesian_optim(chart_json, annot_json, query=annot_json['tasks'][0]['question'], optim_path=args['optim_path'], chart_name=data_json.strip('.json'))        
+            bayesian_optim(chart_json, annot_json, query=annot_json['tasks'][0]['question'], optim_path=args['optim_path'], chart_name=data_json.strip('.json'))
