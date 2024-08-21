@@ -17,8 +17,9 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from botorch.utils.sampling import draw_sobol_samples
 from botorch.acquisition import LogExpectedImprovement
 from botorch.optim import optimize_acqf
-from utils import update_chart
-from metrics import wave_metric
+from utils.utils import update_chart
+from utils.visual_density import vd_loss
+from utils.metrics import wave_metric
 
 def predict(ques: str) -> List:
     """
@@ -57,20 +58,18 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
     """
     # WAVE is a metric that measures how close the colors in the heatmap are to the preferred colors from human [0, 1]
     WAVE = wave_metric(predictions[1]) * 255.
-    # Visual Density is a metric that measures the area of inks used in the chart [0, 1]
-    VD = predictions[2][predictions[2]>253].size / predictions[2].size
     # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 32, which thresholds the whitespaces out)
     heatmap_mean = 0
     for bbox in bboxes:
         bbox_heapmap = predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]]
         if bbox_heapmap[bbox_heapmap>8].size > 0:
             heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
-    return np.mean(WAVE + 2 * heatmap_mean / len(bboxes) - 400 * np.abs(VD - 0.596)) # 0.596 is the average VD of ChartQA
+    return np.mean(WAVE + 2 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2])) # 0.596 is the average VD of ChartQA
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
-    bounds = torch.tensor([[[0.2], [8], [8], [10], [0], [0], [0]],\
-                           [[2],  [30],[30], [60], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
+    bounds = torch.tensor([[[0.5], [10], [10], [20], [0], [0], [0]],\
+                           [[2],  [36],[36], [120], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
     x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
     y_obs = torch.empty(0,1)
 
@@ -78,7 +77,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     for x in x_obs:
         bboxes = update_chart(chart_json, x.tolist(), annotation)
         if len(bboxes) == 0:
-            print('no valid bounding boxes found')
+            # print('no valid bounding boxes found')
             return
         predictions = predict(query)
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
@@ -86,7 +85,9 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     #print(y_obs, x_obs)
     y_max = 0
     # Optimization loop
-    for i in trange(50):
+    max_iter = 50
+    best_iter = 0
+    for i in trange(max_iter):
         gp = SingleTaskGP(
             train_X=x_obs,
             train_Y=y_obs,
@@ -102,6 +103,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
         )
         if y_max < y_obs[-1].item(): # Found a better solution
             y_max = y_obs[-1].item()
+            best_iter = i
             update_chart(chart_json, candidate.tolist()[0], annotation, optim_path, chart_name)
 
         bboxes = update_chart(chart_json, candidate.tolist()[0], annotation)
@@ -109,6 +111,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
         x_obs = torch.concat([x_obs, candidate], dim=0)
 
+    print('best iter appears at', best_iter)
 
 def load_json(data_path: str, annot_path: str) -> List:
     f = open(data_path)

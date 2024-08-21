@@ -1,10 +1,10 @@
 {
   "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-  "config": {"view": {"continuousWidth": 800}},
+  "config": {"view": {"continuousWidth": 600}},
   "vconcat": [
     {
-      "width": 800,
-      "height": 560,
+      "width": 600,
+      "height": 420,
       "title": {
         "text": "",
         "anchor": "start"

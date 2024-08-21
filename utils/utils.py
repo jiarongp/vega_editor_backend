@@ -40,7 +40,7 @@ def update_chart(chart_json: json, params: list, annotation: json, data_path: st
     bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im))
 
     for bbox in bboxes:
-        cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0),2)
+        cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0), 2)
         cv2.imwrite(f'{data_path}/{filename}_bbox.png', im)
     return bboxes
 
