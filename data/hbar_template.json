@@ -16,6 +16,7 @@
         "y": {
           "field": "Entity",
           "type": "ordinal",
+          "sort": null,
           "axis": {"grid": false, "labelFontSize": 17, "labelLimit": 0}
         },
         "x": {

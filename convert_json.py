@@ -12,6 +12,13 @@ def load_base_json(base_json):
     base_json = json.load(f)
     return base_json.copy()
 
+def sortby_value(data_entries: List, v_type: str) -> List:
+    if v_type == 'h_bar':
+        sorted_data = sorted(data_entries, key=lambda x:float(x['value']), reverse=True)
+        return list(sorted_data)
+    elif v_type == 'v_bar':
+        return data_entries
+
 def write_tasks(annot_json:json, questions:List, base_path:str, output_path:str, filename:str, v_type: str):
     if v_type == 'h_bar':
         output_json = load_base_json(os.path.join(base_path, 'hbar_template.json'))
@@ -22,39 +29,40 @@ def write_tasks(annot_json:json, questions:List, base_path:str, output_path:str,
         return
 
     annot_json['tasks'] = []
-    if isinstance(annot_json['models'], list) and annot_json['models'][0]:
+    if isinstance(annot_json['models'], list) and annot_json['models'][0] and len(annot_json['models']) == 1: # Now only support single bar chart
         data_entries = []
         # if 'title' in annot_json['general_figure_info'].keys():
         #     output_json['vconcat'][0]['title'] = annot_json['general_figure_info']['title']['text']
         # else:
         #     output_json['vconcat'][0]['title'] = ''    
-        for q in questions:
-            entities = []
-            ariaLabels = []
-            q['label'] = re.sub('[{()}]', '', q['label'])
-            q_labels = q['label'].split(',')
-            for q_label in q_labels:
-                lowest_label = ''
-                lowest_value = 100000000
-                highest_label = ''
-                highest_value = -1
-                for i, x_l in enumerate(annot_json['models'][0]['x']):
-                    value = re.sub('[^0-9.]','', annot_json['models'][0]['y'][i])
-                    try:
-                        float(value)
-                    except ValueError:
-                        continue
-                    x_label = x_l.replace("'", "")
-                    if not value: continue
+        for i, x_l in enumerate(annot_json['models'][0]['x']):
+            value = re.sub('[^0-9.]','', annot_json['models'][0]['y'][i])
+            try:
+                float(value)
+            except ValueError:
+                continue
+            x_label = x_l.replace("'", "")
+            if not value: continue
 
-                    value = str(Decimal(value)).replace('.0','')
-                    if value.find('0.') > -1:
-                        if len(value) - value.find('.') > 2:
-                            value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
-                    elif value.find('.') > -1:
-                        if len(value) - value.find('.') > 1:
-                            value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
-                    data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
+            value = str(Decimal(value)).replace('.0','')
+            if value.find('0.') > -1:
+                if len(value) - value.find('.') > 2:
+                    value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
+            elif value.find('.') > -1:
+                if len(value) - value.find('.') > 1:
+                    value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
+            data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
+            for q in questions:
+                entities = []
+                ariaLabels = []
+                q['label'] = re.sub('[{()}]', '', q['label'])
+                q_labels = q['label'].split(',')
+                for q_label in q_labels:
+                    lowest_label = ''
+                    lowest_value = 100000000
+                    highest_label = ''
+                    highest_value = -1
+
                     if x_label.lower() in q_label.lower() or q_label.lower() in x_label.lower() or x_label.lower() in q['query'].lower():
                         entities.append(x_label)
                         if v_type == 'h_bar':
@@ -84,6 +92,7 @@ def write_tasks(annot_json:json, questions:List, base_path:str, output_path:str,
                 annot_json['tasks'].append({"question": q['query'], "labels": q_labels, "entity": entities, "aria-label": ariaLabels})
 
         if len(annot_json['tasks']) > 0: # save if the task has entities
+            data_entries = sortby_value(data_entries, v_type) # sort h_bars
             output_json['vconcat'][0]['data']['values'] = data_entries
             output_json['name'] = filename
             save_chart_batch(output_json, annot_json, output_path, filename.strip('.json'))

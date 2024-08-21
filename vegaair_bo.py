@@ -65,7 +65,7 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
         bbox_heapmap = predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]]
         if bbox_heapmap[bbox_heapmap>8].size > 0:
             heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
-    return np.mean(WAVE + 2 * heatmap_mean / len(bboxes) - 256 * np.abs(VD - 0.596)) # 0.596 is the average VD of ChartQA
+    return np.mean(WAVE + 2 * heatmap_mean / len(bboxes) - 400 * np.abs(VD - 0.596)) # 0.596 is the average VD of ChartQA
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
@@ -86,7 +86,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     #print(y_obs, x_obs)
     y_max = 0
     # Optimization loop
-    for i in trange(20):
+    for i in trange(50):
         gp = SingleTaskGP(
             train_X=x_obs,
             train_Y=y_obs,
