@@ -90,8 +90,10 @@ def write_tasks(annot_json: json, questions: List, base_path: str, output_path: 
                 elif v_type == 'v_bar':
                     ariaLabels.append(f"Entity: {highest_label}; value: {highest_value}")
 
-        if len(entities) > 0:
-            annot_json['tasks'].append({"question": q['query'], "labels": q_labels, "entity": entities, "aria-label": ariaLabels})
+            if len(entities) > 0:
+                annot_json['tasks'].append({"question": q['query'], "labels": q_labels, "entity": entities, "aria-label": ariaLabels})
+        
+        if len(annot_json['tasks']) > 0:    
             data_entries = sortby_value(data_entries, v_type) # sort h_bars
             output_json['vconcat'][0]['data']['values'] = data_entries
             output_json['name'] = filename

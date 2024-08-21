@@ -68,8 +68,8 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
     tkwargs = {"device": "cpu:0", "dtype": torch.double}
-    bounds = torch.tensor([[[0.5], [10], [10], [20], [0], [0], [0]],\
-                           [[2],  [36],[36], [120], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
+    bounds = torch.tensor([[[0], [0], [0], [0], [0], [0], [0]],\
+                           [[1], [1], [1], [1], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
     x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
     y_obs = torch.empty(0,1)
 
@@ -77,7 +77,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     for x in x_obs:
         bboxes = update_chart(chart_json, x.tolist(), annotation)
         if len(bboxes) == 0:
-            # print('no valid bounding boxes found')
+            print('no valid bounding boxes found', chart_name)
             return
         predictions = predict(query)
         y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
