@@ -33,26 +33,8 @@ def write_tasks(annot_json: json, questions: List, base_path: str, output_path: 
     # if 'title' in annot_json['general_figure_info'].keys():
     #     output_json['vconcat'][0]['title'] = annot_json['general_figure_info']['title']['text']
     # else:
-    #     output_json['vconcat'][0]['title'] = ''    
-    for i, x_l in enumerate(annot_json['models'][0]['x']):
-        value = re.sub('[^0-9.]','', annot_json['models'][0]['y'][i])
-        try:
-            float(value)
-        except ValueError:
-            continue
-        x_label = x_l.replace("'", "")
-        if not value: continue
-
-        value = str(Decimal(value)).replace('.0','')
-        if value.find('0.') > -1:
-            if len(value) - value.find('.') > 2:
-                value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
-        elif value.find('.') > -1:
-            if len(value) - value.find('.') > 1:
-                value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
-        data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
-
-    for q in questions:
+    #     output_json['vconcat'][0]['title'] = ''
+    for ii, q in enumerate(questions):
         entities, ariaLabels = [], []
         q['label'] = re.sub('[{()}]', '', q['label'])
         q_labels = q['label'].split(',')
@@ -63,6 +45,21 @@ def write_tasks(annot_json: json, questions: List, base_path: str, output_path: 
             highest_value = -1
             for i, x_l in enumerate(annot_json['models'][0]['x']):
                 x_label = x_l.replace("'", "")
+                value = re.sub('[^0-9.]','', annot_json['models'][0]['y'][i])
+                try:
+                    float(value)
+                except ValueError:
+                    return
+                if not value: return
+                value = str(Decimal(value)).replace('.0','')
+                if value.find('0.') > -1:
+                    if len(value) - value.find('.') > 2:
+                        value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
+                elif value.find('.') > -1:
+                    if len(value) - value.find('.') > 1:
+                        value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
+                if ii == 0:
+                    data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
 
                 if x_label.lower() in q_label.lower() or q_label.lower() in x_label.lower() or x_label.lower() in q['query'].lower():
                     entities.append(x_label)
