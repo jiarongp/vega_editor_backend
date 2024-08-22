@@ -3,23 +3,30 @@ import argparse
 import json
 import torch
 torch.manual_seed(42)
-from tqdm import trange
 from PIL import Image
 import numpy as np
 from typing import List
 from model.model import SalFormer
 from transformers import AutoImageProcessor, AutoTokenizer, BertModel, SwinModel
 import cv2
-from botorch.models import SingleTaskGP
-from botorch.models.transforms import Normalize, Standardize
-from botorch.fit import fit_gpytorch_mll
-from gpytorch.mlls import ExactMarginalLogLikelihood
-from botorch.utils.sampling import draw_sobol_samples
-from botorch.acquisition import LogExpectedImprovement
-from botorch.optim import optimize_acqf
 from utils.utils import update_chart
 from utils.visual_density import vd_loss
 from utils.metrics import wave_metric
+
+from ax.service.ax_client import AxClient, ObjectiveProperties
+from ax.modelbridge.registry import Models
+
+# Ax wrappers for BoTorch components
+from ax.models.torch.botorch_modular.surrogate import Surrogate
+
+# Experiment examination utilities
+from ax.service.utils.report_utils import exp_to_df
+from botorch.acquisition.logei import qLogNoisyExpectedImprovement
+from botorch.models.gp_regression import SingleTaskGP
+
+# BoTorch components
+from ax.modelbridge.generation_strategy import GenerationStep, GenerationStrategy
+
 
 def predict(ques: str) -> List:
     """
@@ -46,7 +53,7 @@ def predict(ques: str) -> List:
     heatmap = cv2.resize(heatmap, (image.size[1], image.size[0]))
     return [heatmap, image, np.array(gary_image)]
 
-def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
+def optim_func(predictions: List, bboxes: List[np.ndarray]) -> dict:
     """
     Optimisation function of BO.
 
@@ -58,58 +65,79 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> float:
     """
     # WAVE is a metric that measures how close the colors in the heatmap are to the preferred colors from human [0, 1]
     WAVE = wave_metric(predictions[1]) * 255.
-    # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 32, which thresholds the whitespaces out)
+    # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 8, which thresholds the whitespaces out)
     heatmap_mean = 0
     for bbox in bboxes:
         bbox_heapmap = predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]]
         if bbox_heapmap[bbox_heapmap>8].size > 0:
             heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
-    return np.mean(WAVE + 2 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2])) # 0.596 is the average VD of ChartQA
+     # 0.596 is the average VD of ChartQA
+    return {"loss_max": (WAVE + 4 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2]), 0.0)}
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
-    tkwargs = {"device": "cpu:0", "dtype": torch.double}
-    bounds = torch.tensor([[[0], [0], [0], [0], [0], [0], [0]],\
-                           [[1], [1], [1], [1], [1], [1], [1]]], **tkwargs) # lower bound, upper bound
-    x_obs = draw_sobol_samples(bounds=bounds, n=5, q=1, seed=0).squeeze(-1)
-    y_obs = torch.empty(0,1)
+    gs = GenerationStrategy(
+        steps=[
+            GenerationStep(  # Initialization step
+                # Which model to use for this step
+                model=Models.SOBOL,
+                # How many generator runs (each of which is then made a trial)
+                # to produce with this step
+                num_trials=5,
+                # How many trials generated from this step must be `COMPLETED`
+                # before the next one
+                min_trials_observed=5,
+            ),
+            GenerationStep(  # BayesOpt step
+                model=Models.BOTORCH_MODULAR,
+                # No limit on how many generator runs will be produced
+                num_trials=50,
+                model_kwargs={  # Kwargs to pass to `BoTorchModel.__init__`
+                    "surrogate": Surrogate(SingleTaskGP),
+                    "botorch_acqf_class": qLogNoisyExpectedImprovement,
+                },
+            ),
+        ]
+    )
+    ax_client = AxClient(generation_strategy=gs)
+    parameters = []
+    for i in range(7):
+        parameters.append(
+            {
+            "name": f"x{i}",
+            "type": "range",
+            "bounds": [0.0, 1.0],
+            "value_type": "float",  # Optional, defaults to inference from type of "bounds".
+            "log_scale": False,  # Optional, defaults to False.
+        })
+    #TODO: add more parameters
+    parameters.append({
+        "name": f"x7",
+        "type": "range",
+        "bounds": [0.0, 1.0],
+        "value_type": "int",  # Optional, defaults to inference from type of "bounds".
+        "log_scale": False,  # Optional, defaults to False.
+    })
+    ax_client.create_experiment(
+        name="hartmann_test_experiment",
+        parameters=parameters,    
+        objectives={"loss_max": ObjectiveProperties(minimize=False)}
+    )
 
-    #Initial observations
-    for x in x_obs:
-        bboxes = update_chart(chart_json, x.tolist(), annotation)
-        if len(bboxes) == 0:
-            print('no valid bounding boxes found', chart_name)
-            return
-        predictions = predict(query)
-        y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
-
-    #print(y_obs, x_obs)
-    y_max = 0
     # Optimization loop
-    max_iter = 50
+    max_iter = 100
     best_iter = 0
-    for i in trange(max_iter):
-        gp = SingleTaskGP(
-            train_X=x_obs,
-            train_Y=y_obs,
-            # input_transform=Normalize(d=1),
-            outcome_transform=Standardize(m=1),
-        )
-        mll = ExactMarginalLogLikelihood(gp.likelihood, gp)
-        fit_gpytorch_mll(mll)
-
-        logNEI = LogExpectedImprovement(model=gp, best_f=y_obs.max())
-        candidate, acq_value = optimize_acqf(
-            logNEI, bounds=bounds.squeeze(-1), q=1, num_restarts=5, raw_samples=20,
-        )
-        if y_max < y_obs[-1].item(): # Found a better solution
-            y_max = y_obs[-1].item()
-            best_iter = i
-            update_chart(chart_json, candidate.tolist()[0], annotation, optim_path, chart_name)
-
-        bboxes = update_chart(chart_json, candidate.tolist()[0], annotation)
+    for i in range(max_iter):
+        parameterization, trial_index = ax_client.get_next_trial()
+        # Local evaluation here can be replaced with deployment to external system.
+        bboxes = update_chart(chart_json, parameterization, annotation)
         predictions = predict(query)
-        y_obs = torch.concat([y_obs, torch.tensor([optim_func(predictions, bboxes)]).unsqueeze(-1)], dim=0)
-        x_obs = torch.concat([x_obs, candidate], dim=0)
+
+        ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func(predictions, bboxes))
+
+    best_parameters, values = ax_client.get_best_parameters()
+    # print(best_parameters, values)
+    update_chart(chart_json, best_parameters, annotation, optim_path, chart_name)
+
 
     print('best iter appears at', best_iter)
 

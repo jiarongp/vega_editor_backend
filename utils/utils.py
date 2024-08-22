@@ -11,20 +11,22 @@ from PIL import Image
 
 PARAM_BOUNDS = {
     'aspect_ratio': [0.5, 2],
-    'font_size_axis': [10, 36],
-    'font_size_mark': [10, 36],
+    'font_size_axis': [12, 36],
+    'font_size_mark': [12, 36],
     'bar_size': [20, 120]
 }
 
 def calc_param(dict_key: str, param: float):
     return PARAM_BOUNDS[dict_key][0] + (PARAM_BOUNDS[dict_key][1] - PARAM_BOUNDS[dict_key][0]) * param
 
-def update_chart(chart_json: json, params: list, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
+def update_chart(chart_json: json, params: dict, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
+    #TODO:
+    print(params['x7'])
     # params: [aspect_ratio, font_size_axis, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
-    chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * calc_param('aspect_ratio', params[0])
-    chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = calc_param('font_size_mark', params[2])
-    chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = calc_param('bar_size', params[3])
-    color_rgb = [params[4], params[5], params[6]]
+    chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * calc_param('aspect_ratio', params['x0'])
+    chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = calc_param('font_size_mark', params['x2'])
+    chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = calc_param('bar_size', params['x3'])
+    color_rgb = [params['x4'], params['x5'], params['x6']]
     for _, entity in enumerate(annotation['tasks'][0]['entity']):
         f = False
         for dd in chart_json['vconcat'][0]['layer'][0]['encoding']['color']['condition']:
@@ -38,9 +40,9 @@ def update_chart(chart_json: json, params: list, annotation: json, data_path: st
             "value": mcolors.to_hex(color_rgb)
         })
     if annotation['type'] == 'h_bar':
-        chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = calc_param('font_size_axis', params[1])
+        chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
     elif annotation['type'] == 'v_bar':
-        chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = calc_param('font_size_axis', params[1])
+        chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
     # print(chart_json['name'])
