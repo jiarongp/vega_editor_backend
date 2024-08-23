@@ -75,6 +75,7 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> dict:
     return {"loss_max": (WAVE + 4 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2]), 0.0)}
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
+    max_iter = 10
     gs = GenerationStrategy(
         steps=[
             GenerationStep(  # Initialization step
@@ -90,7 +91,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
             GenerationStep(  # BayesOpt step
                 model=Models.BOTORCH_MODULAR,
                 # No limit on how many generator runs will be produced
-                num_trials=50,
+                num_trials=max_iter,
                 model_kwargs={  # Kwargs to pass to `BoTorchModel.__init__`
                     "surrogate": Surrogate(SingleTaskGP),
                     "botorch_acqf_class": qLogNoisyExpectedImprovement,
@@ -109,37 +110,40 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
             "value_type": "float",  # Optional, defaults to inference from type of "bounds".
             "log_scale": False,  # Optional, defaults to False.
         })
-    #TODO: add more parameters
+    # v_bar label rotation
     parameters.append({
-        "name": f"x7",
+        "name": f"x_rt",
+        "type": "range",
+        "bounds": [0.0, 2.0],
+        "value_type": "int",  # Optional, defaults to inference from type of "bounds".
+        "log_scale": False,  # Optional, defaults to False.
+    })
+    # bar orientation
+    parameters.append({
+        "name": f"x_ot",
         "type": "range",
         "bounds": [0.0, 1.0],
         "value_type": "int",  # Optional, defaults to inference from type of "bounds".
         "log_scale": False,  # Optional, defaults to False.
     })
     ax_client.create_experiment(
-        name="hartmann_test_experiment",
+        name="baropt_experiment",
         parameters=parameters,    
         objectives={"loss_max": ObjectiveProperties(minimize=False)}
     )
 
     # Optimization loop
-    max_iter = 100
-    best_iter = 0
+    # best_iter = 0
     for i in range(max_iter):
         parameterization, trial_index = ax_client.get_next_trial()
         # Local evaluation here can be replaced with deployment to external system.
         bboxes = update_chart(chart_json, parameterization, annotation)
         predictions = predict(query)
-
         ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func(predictions, bboxes))
 
     best_parameters, values = ax_client.get_best_parameters()
-    # print(best_parameters, values)
     update_chart(chart_json, best_parameters, annotation, optim_path, chart_name)
-
-
-    print('best iter appears at', best_iter)
+    # print('best iter appears at', best_iter, best_parameters, values)
 
 def load_json(data_path: str, annot_path: str) -> List:
     f = open(data_path)

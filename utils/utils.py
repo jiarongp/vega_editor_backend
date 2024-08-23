@@ -13,15 +13,18 @@ PARAM_BOUNDS = {
     'aspect_ratio': [0.5, 2],
     'font_size_axis': [12, 36],
     'font_size_mark': [12, 36],
-    'bar_size': [20, 120]
+    'bar_size': [20, 120],
+    'axis_label_rotation': [-90, -45, 0],
 }
 
-def calc_param(dict_key: str, param: float):
+def calc_param(dict_key: str, param: float, is_discrete: bool = False):
+    if is_discrete:
+        return PARAM_BOUNDS[dict_key][int(param)]
     return PARAM_BOUNDS[dict_key][0] + (PARAM_BOUNDS[dict_key][1] - PARAM_BOUNDS[dict_key][0]) * param
 
 def update_chart(chart_json: json, params: dict, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
-    #TODO:
-    print(params['x7'])
+    # TODO: change_orientation
+    # chart_json, annotation = change_orientation(chart_json, params['x_ot'])
     # params: [aspect_ratio, font_size_axis, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * calc_param('aspect_ratio', params['x0'])
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = calc_param('font_size_mark', params['x2'])
@@ -41,8 +44,11 @@ def update_chart(chart_json: json, params: dict, annotation: json, data_path: st
         })
     if annotation['type'] == 'h_bar':
         chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
+        chart_json['vconcat'][0]['layer'][1]['mark']['xOffset'] = calc_param('font_size_axis', params['x1'])/2
     elif annotation['type'] == 'v_bar':
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
+        chart_json['vconcat'][0]['layer'][1]['mark']['yOffset'] = calc_param('font_size_axis', params['x1'])*2/3
+        chart_json['vconcat'][0]['encoding']['x']['axis']['labelAngle'] = calc_param('axis_label_rotation', params['x_rt'], is_discrete=True)
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
     # print(chart_json['name'])
@@ -88,10 +94,11 @@ def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarra
                 path_string = element.getAttribute('d')
                 path = parse_path(path_string)
                 bbox = path.boundingbox()
-                bbox[0] += (x_offset - 80) # making bounding box bigger
-                bbox[1] += (0)
-                bbox[2] += (x_offset + 50)
-                bbox[3] += (50)
+                if annotation['type'] == 'h_bar':
+                    bbox[0] += (x_offset - 120) # making bounding box bigger
+                    bbox[1] += (0)
+                    bbox[2] += (x_offset + 120)
+                    bbox[3] += (50)
                 if bbox[0] < 0: bbox[0] = 0
                 if bbox[1] < 0: bbox[1] = 0
                 if bbox[2] > imshape[1]: bbox[2] = imshape[1] - 1

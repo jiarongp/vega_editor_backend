@@ -54,16 +54,15 @@
         {
           "mark": {
             "type": "text",
-            "dx": 16,
+            "dx": 0,
             "dy": 0,
-            "xOffset": 10,
+            "xOffset": 12,
             "yOffset": 0,
             "angle": 0,
-            "align": "right",
+            "align": "left",
             "baseline": "middle",
             "font": "serif",
             "fontSize": 24,
-            "fontStyle": "italic",
             "fontWeight": "normal",
             "opacity": 1
           },

@@ -21,7 +21,7 @@
         "x": {
           "field": "Entity",
           "type": "ordinal",
-          "axis": {"grid": false, "labelFontSize": 17, "labelLimit": 0}
+          "axis": {"grid": false, "labelFontSize": 17, "labelLimit": 0, "labelAngle": -90}
         },
         "opacity": {"value": 1}
       },
@@ -53,15 +53,14 @@
           "mark": {
             "type": "text",
             "dx": 0,
-            "dy": 16,
-            "xOffset": 10,
-            "yOffset": 0,
+            "dy": 0,
+            "xOffset": 0,
+            "yOffset": -16,
             "angle": 0,
-            "align": "right",
+            "align": "center",
             "baseline": "middle",
             "font": "serif",
             "fontSize": 24,
-            "fontStyle": "italic",
             "fontWeight": "normal",
             "opacity": 1
           },
