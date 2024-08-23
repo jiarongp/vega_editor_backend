@@ -75,7 +75,7 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> dict:
     return {"loss_max": (WAVE + 4 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2]), 0.0)}
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
-    max_iter = 10
+    max_iter = 50
     gs = GenerationStrategy(
         steps=[
             GenerationStep(  # Initialization step

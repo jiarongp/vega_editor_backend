@@ -32,20 +32,20 @@
           "encoding": {
             "color": {
               "condition":[
-                {"test": "datum.x === 'none'", "value": "#d8a27d"}
+                {"test": "datum.Entity === 'none'", "value": "#d8a27d"}
               ]
               ,
               "value": "#949d48"
             },
             "opacity": {
               "condition": [
-                {"test": "datum.x === 'none'", "value": 1}
+                {"test": "datum.Entity === 'none'", "value": 1}
               ],
               "value": 1
             },
             "size": {
               "condition": [
-                {"test": "datum.x === 'none'", "value": 30}
+                {"test": "datum.Entity === 'none'", "value": 30}
               ],
               "value": 40
             }

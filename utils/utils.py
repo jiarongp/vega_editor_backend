@@ -22,10 +22,43 @@ def calc_param(dict_key: str, param: float, is_discrete: bool = False):
         return PARAM_BOUNDS[dict_key][int(param)]
     return PARAM_BOUNDS[dict_key][0] + (PARAM_BOUNDS[dict_key][1] - PARAM_BOUNDS[dict_key][0]) * param
 
+def change_orientation(chart_json: json, annotation: json, ot: int) -> json:
+    # 0: horizontal, 1: vertical
+    if (ot == 0 and annotation['type'] == 'h_bar') or (ot == 1 and annotation['type'] == 'v_bar'):
+        print('not changing orientation 1')
+        return chart_json, annotation
+    elif ot == 0 and annotation['type'] == 'v_bar':
+        annotation['type'] = 'h_bar'
+        chart_json['vconcat'][0]['encoding']['tmp'] = chart_json['vconcat'][0]['encoding']['x']
+        chart_json['vconcat'][0]['encoding']['x'] = chart_json['vconcat'][0]['encoding']['y']
+        chart_json['vconcat'][0]['encoding']['y'] = chart_json['vconcat'][0]['encoding']['tmp']
+        del chart_json['vconcat'][0]['encoding']['tmp']
+        chart_json['vconcat'][0]['layer'][1]['encoding']['x'] = chart_json['vconcat'][0]['layer'][1]['encoding']['y']
+        del chart_json['vconcat'][0]['layer'][1]['encoding']['y']
+        for i, task in enumerate(annotation['tasks']):
+            for j, label in enumerate(task['aria-label']):
+                parts = label.split(';')
+                annotation['tasks'][i]['aria-label'][j] = f"{parts[1].strip()}; {parts[0].strip()}"
+        return chart_json, annotation
+    elif ot == 1 and annotation['type'] == 'h_bar':
+        annotation['type'] = 'v_bar'
+        chart_json['vconcat'][0]['encoding']['tmp'] = chart_json['vconcat'][0]['encoding']['x']
+        chart_json['vconcat'][0]['encoding']['x'] = chart_json['vconcat'][0]['encoding']['y']
+        chart_json['vconcat'][0]['encoding']['y'] = chart_json['vconcat'][0]['encoding']['tmp']
+        del chart_json['vconcat'][0]['encoding']['tmp']
+        chart_json['vconcat'][0]['layer'][1]['encoding']['y'] = chart_json['vconcat'][0]['layer'][1]['encoding']['x']
+        del chart_json['vconcat'][0]['layer'][1]['encoding']['x']
+        for i, task in enumerate(annotation['tasks']):
+            for j, label in enumerate(task['aria-label']):
+                parts = label.split(';')
+                annotation['tasks'][i]['aria-label'][j] = f"{parts[1].strip()}; {parts[0].strip()}"
+        return chart_json, annotation
+
 def update_chart(chart_json: json, params: dict, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
-    # TODO: change_orientation
-    # chart_json, annotation = change_orientation(chart_json, params['x_ot'])
-    # params: [aspect_ratio, font_size_axis, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b]
+    # PARAMS: [aspect_ratio, font_size_axis, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b, axis_label_rotation(v_bar), orientation]
+    # change_orientation
+    chart_json, annotation = change_orientation(chart_json, annotation, params['x_ot'])
+
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * calc_param('aspect_ratio', params['x0'])
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = calc_param('font_size_mark', params['x2'])
     chart_json['vconcat'][0]['layer'][0]['encoding']['size']['value'] = calc_param('bar_size', params['x3'])
@@ -45,13 +78,19 @@ def update_chart(chart_json: json, params: dict, annotation: json, data_path: st
     if annotation['type'] == 'h_bar':
         chart_json['vconcat'][0]['encoding']['y']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
         chart_json['vconcat'][0]['layer'][1]['mark']['xOffset'] = calc_param('font_size_axis', params['x1'])/2
+        chart_json['vconcat'][0]['layer'][1]['mark']['yOffset'] = 0
+        chart_json['vconcat'][0]['layer'][1]['mark']['dx'] = 16
+        chart_json['vconcat'][0]['layer'][1]['mark']['align'] = 'left'
+        chart_json['vconcat'][0]['encoding']['y']['axis']['labelAngle'] = 0
     elif annotation['type'] == 'v_bar':
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
+        chart_json['vconcat'][0]['layer'][1]['mark']['xOffset'] = 0
         chart_json['vconcat'][0]['layer'][1]['mark']['yOffset'] = calc_param('font_size_axis', params['x1'])*2/3
+        chart_json['vconcat'][0]['layer'][1]['mark']['dx'] = 0
+        chart_json['vconcat'][0]['layer'][1]['mark']['align'] = 'center'
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelAngle'] = calc_param('axis_label_rotation', params['x_rt'], is_discrete=True)
 
     chart = alt.Chart.from_json(json.dumps(chart_json))
-    # print(chart_json['name'])
     chart.save(f'{data_path}/{filename}.png')
     chart.save(f'{data_path}/{filename}.svg')
     im = Image.open(f'{data_path}/{filename}.png').convert("RGB")
@@ -82,7 +121,7 @@ def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarra
             child = g.firstChild
             # find Y-axis label in h_bar or X-axis label in v_bar
             if (annotation['type'] == 'h_bar' and 'rotate(-90)' in child.getAttribute('transform')) \
-                or (annotation['type'] == 'v_bar'and not 'rotate(-90)' in child.getAttribute('transform')):
+            or (annotation['type'] == 'v_bar' and not 'rotate(-90)' in child.getAttribute('transform')):
                 x_offset = float(child.getAttribute('transform').strip('translate(-').split(',')[0]) + float(child.getAttribute('font-size')[0:1]) # offset caused by axis labels
                 # print(x_offset)
                 break
