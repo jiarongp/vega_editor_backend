@@ -1,4 +1,5 @@
 import os, sys
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 import json
 import torch
@@ -8,8 +9,9 @@ import numpy as np
 from typing import List
 from model.model import SalFormer
 from transformers import AutoImageProcessor, AutoTokenizer, BertModel, SwinModel
-import cv2
+# import cv2
 from utils.utils import update_chart
+from utils.text_ocr import txt_loss
 from utils.visual_density import vd_loss
 from utils.metrics import wave_metric
 
@@ -20,7 +22,6 @@ from ax.modelbridge.registry import Models
 from ax.models.torch.botorch_modular.surrogate import Surrogate
 
 # Experiment examination utilities
-from ax.service.utils.report_utils import exp_to_df
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.models.gp_regression import SingleTaskGP
 
@@ -50,20 +51,26 @@ def predict(ques: str) -> List:
 
     # image_np = np.array(image)
     # image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2RGBA)
-    heatmap = cv2.resize(heatmap, (image.size[1], image.size[0]))
+    heatmap = np.resize(heatmap, (image.size[1], image.size[0]))
     return [heatmap, image, np.array(gary_image)]
 
-def optim_func(predictions: List, bboxes: List[np.ndarray]) -> dict:
+
+def optim_func(predictions: List, bboxes: List[np.ndarray], chart_json: json) -> dict:
     """
     Optimisation function of BO.
 
     Args:
         predictions[list]: same as the output of predict()
+        predictions[0]: heatmap from VisSalFormer (np.array)
+        predictions[1]: original image (Image)
+        predictions[2]: gray image (np.array)
         bbox: bounding box coordinates
 
     Returns: score of the optimisation function
     """
-    # WAVE is a metric that measures how close the colors in the heatmap are to the preferred colors from human [0, 1]
+    # Text Loss is a metric that measures the readability of texts, ranges [0, 1]    
+    TXT_OCR = txt_loss(predictions[1], chart_json) * 255.
+    # WAVE is a metric that measures how close the colors in the image are to the preferred colors from human [0, 1]
     WAVE = wave_metric(predictions[1]) * 255.
     # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 8, which thresholds the whitespaces out)
     heatmap_mean = 0
@@ -71,11 +78,12 @@ def optim_func(predictions: List, bboxes: List[np.ndarray]) -> dict:
         bbox_heapmap = predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]]
         if bbox_heapmap[bbox_heapmap>8].size > 0:
             heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
-     # 0.596 is the average VD of ChartQA
-    return {"loss_max": (WAVE + 4 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2]), 0.0)}
+    if len(bboxes) == 0:
+        return {"loss_max": (WAVE + TXT_OCR - 512 * vd_loss(predictions[2]), 0.0)}
+    return {"loss_max": (WAVE + TXT_OCR + 4 * heatmap_mean / len(bboxes) - 512 * vd_loss(predictions[2]), 0.0)}
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
-    max_iter = 50
+    max_iter = 30
     gs = GenerationStrategy(
         steps=[
             GenerationStep(  # Initialization step
@@ -139,7 +147,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
         # Local evaluation here can be replaced with deployment to external system.
         bboxes = update_chart(chart_json, parameterization, annotation)
         predictions = predict(query)
-        ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func(predictions, bboxes))
+        ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func(predictions, bboxes, chart_json))
 
     best_parameters, values = ax_client.get_best_parameters()
     update_chart(chart_json, best_parameters, annotation, optim_path, chart_name)

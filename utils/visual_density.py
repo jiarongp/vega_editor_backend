@@ -6,8 +6,8 @@ from PIL import Image
 # Visual Density is a metric that measures the area of inks used in the chart [0, 1]    
 def vd_loss(img_arr: np.ndarray) -> float:
     bg_ratio = img_arr[img_arr>253].size / img_arr.size
-    M = 0.5956
-    STD = 0.0926
+    M = 0.5956 # the average VD of ChartQA
+    STD = 0.0926 #  the std VD of ChartQA
     if bg_ratio < M + 3 * STD and bg_ratio > M - 3 * STD:
         return 0
     return np.abs(bg_ratio - M)

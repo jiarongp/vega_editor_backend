@@ -19,7 +19,7 @@ def sortby_value(data_entries: List, v_type: str) -> List:
     elif v_type == 'v_bar':
         return data_entries
 
-def write_tasks(annot_json: json, questions: List, base_path: str, output_path: str, filename:str, v_type: str):
+def write_tasks(annot_json: json, questions: List, input_path: str, base_path: str, output_path: str, filename:str, v_type: str):
     if v_type == 'h_bar':
         output_json = load_base_json(os.path.join(base_path, 'hbar_template.json'))
     elif v_type == 'v_bar':
@@ -89,12 +89,12 @@ def write_tasks(annot_json: json, questions: List, base_path: str, output_path: 
 
             if len(entities) > 0:
                 annot_json['tasks'].append({"question": q['query'], "labels": q_labels, "entity": entities, "aria-label": ariaLabels})
-        
+
         if len(annot_json['tasks']) > 0:    
             data_entries = sortby_value(data_entries, v_type) # sort h_bars
             output_json['vconcat'][0]['data']['values'] = data_entries
             output_json['name'] = filename
-            save_chart_batch(output_json, annot_json, output_path, filename.strip('.json'))
+            save_chart_batch(output_json, annot_json, input_path, output_path, filename.strip('.json'))
 
 def process_json(input_path: str, subset: str, output_path: str, base_path: str):
     for i in trange(len(os.listdir(os.path.join(input_path, subset, 'annotations')))):
@@ -106,7 +106,7 @@ def process_json(input_path: str, subset: str, output_path: str, base_path: str)
         if not questions: continue
         f2 = open(os.path.join(input_path, subset, 'annotations', filename))
         annot_json = json.load(f2)
-        write_tasks(annot_json, questions, base_path, output_path, filename, annot_json['type'])
+        write_tasks(annot_json, questions, os.path.join(input_path,subset), base_path, output_path, filename, annot_json['type'])
 
 
 if __name__ == '__main__':

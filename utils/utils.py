@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import numpy as np
 import altair as alt
 from matplotlib import colors as mcolors
@@ -11,8 +12,8 @@ from PIL import Image
 
 PARAM_BOUNDS = {
     'aspect_ratio': [0.5, 2],
-    'font_size_axis': [12, 36],
-    'font_size_mark': [12, 36],
+    'font_size_axis': [15, 32],
+    'font_size_mark': [15, 32],
     'bar_size': [20, 120],
     'axis_label_rotation': [-90, -45, 0],
 }
@@ -85,7 +86,7 @@ def update_chart(chart_json: json, params: dict, annotation: json, data_path: st
     elif annotation['type'] == 'v_bar':
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelFontSize'] = calc_param('font_size_axis', params['x1'])
         chart_json['vconcat'][0]['layer'][1]['mark']['xOffset'] = 0
-        chart_json['vconcat'][0]['layer'][1]['mark']['yOffset'] = calc_param('font_size_axis', params['x1'])*2/3
+        chart_json['vconcat'][0]['layer'][1]['mark']['yOffset'] = -calc_param('font_size_axis', params['x1'])*2/3
         chart_json['vconcat'][0]['layer'][1]['mark']['dx'] = 0
         chart_json['vconcat'][0]['layer'][1]['mark']['align'] = 'center'
         chart_json['vconcat'][0]['encoding']['x']['axis']['labelAngle'] = calc_param('axis_label_rotation', params['x_rt'], is_discrete=True)
@@ -96,20 +97,22 @@ def update_chart(chart_json: json, params: dict, annotation: json, data_path: st
     im = Image.open(f'{data_path}/{filename}.png').convert("RGB")
     im = np.array(im)
     bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im))
+    if not filename == 'chart':
+        print(filename)
 
     for bbox in bboxes:
         cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0), 2)
         cv2.imwrite(f'{data_path}/{filename}_bbox.png', im)
     return bboxes
 
-def save_chart_batch(chart_json: json, annotation: json, output_path: str, filename: str = 'chart'):
+def save_chart_batch(chart_json: json, annotation: json, input_path: str, output_path: str, filename: str = 'chart'):    
     chart = alt.Chart.from_json(json.dumps(chart_json))
     chart.save(os.path.join(output_path, 'svgs', f'{filename}.svg'))
     with open(os.path.join(output_path, 'vegas', f'{filename}.json'), 'w') as out_file:
         json.dump(chart_json, out_file)
     with open(os.path.join(output_path, 'annotations', f'{filename}.json'), 'w') as out_file:
         json.dump(annotation, out_file)
-    #return get_bbox(f'data/{filename}.svg', annotation)
+    shutil.copy(os.path.join(input_path, 'png', filename+'.png'), os.path.join(output_path, 'png', filename+'.png'))
 
 def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarray]:
     xmldoc = minidom.parse(svg_file)
