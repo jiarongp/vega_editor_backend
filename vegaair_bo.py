@@ -6,6 +6,7 @@ import torch
 torch.manual_seed(42)
 from PIL import Image
 import numpy as np
+np.random.seed(42)
 from typing import List
 from model.model import SalFormer
 from transformers import AutoImageProcessor, AutoTokenizer, BertModel, SwinModel
@@ -82,8 +83,7 @@ def optim_func(predictions: List, bboxes: List[np.ndarray], chart_json: json) ->
     OVERLAP = overlap_loss(bboxes[0][3]-bboxes[0][1]-50, chart_json['vconcat'][0]['height'], len(chart_json['vconcat'][0]['data']['values'])) * 256.
     return {"loss_max": (WAVE + TXT_OCR + 4 * heatmap_mean / len(bboxes) - VD - OVERLAP, 0)}
 
-def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
-    max_iter = 50
+def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str, max_iter: int = 50):
     gs = GenerationStrategy(
         steps=[
             GenerationStep(  # Initialization step

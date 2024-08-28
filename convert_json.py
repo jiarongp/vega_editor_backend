@@ -51,21 +51,22 @@ def write_tasks(annot_json: json, questions: List, input_path: str, base_path: s
                 except ValueError:
                     return
                 if not value: return
-                value = str(Decimal(value)).replace('.0','')
+                if value.find('.0') == len(value) - 2:
+                    value = str(Decimal(value)).replace('.0','')
                 if value.find('0.') > -1 or value.find('.') > -1:
                     if len(value) - value.find('.') > 2:
                         value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
                     #if len(value) - value.find('.') > 1:
                     #    value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
                 if ii == 0:
-                    data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
+                    data_entries.append({"Entity": x_label, "value": value})
 
                 if x_label.lower() in q_label.lower() or q_label.lower() in x_label.lower() or x_label.lower() in q['query'].lower():
                     entities.append(x_label)
                     if v_type == 'h_bar':
-                        ariaLabels.append(f"value: {str(Decimal(value)).replace('.0','')}; Entity: {x_label}")
+                        ariaLabels.append(f"value: {value}; Entity: {x_label}")
                     elif v_type == 'v_bar':
-                        ariaLabels.append(f"Entity: {x_label}; value: {str(Decimal(value)).replace('.0','')}")
+                        ariaLabels.append(f"Entity: {x_label}; value: {value}")
 
                 if float(value) < float(lowest_value):
                     lowest_label = x_label

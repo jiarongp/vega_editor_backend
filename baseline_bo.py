@@ -4,6 +4,7 @@ import json
 import torch
 torch.manual_seed(42)
 import numpy as np
+np.random.seed(42)
 from utils.utils import update_chart, load_json
 
 from ax.service.ax_client import AxClient, ObjectiveProperties
@@ -22,17 +23,11 @@ from ax.modelbridge.generation_strategy import GenerationStep, GenerationStrateg
 
 def optim_func() -> dict:
     """
-    Optimisation function of BO.
-
-    Args:
-        bbox: bounding box coordinates
-
-    Returns: score of the optimisation function
+    Optimisation function of BO. Naive version.
     """
     return {"loss_max": np.random.normal(0, 1, 1)[0]}
 
-def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
-    max_iter = 20
+def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str, max_iter:int = 10):
     gs = GenerationStrategy(
         steps=[
             GenerationStep(  # Initialization step
