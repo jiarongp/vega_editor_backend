@@ -65,11 +65,11 @@ def optim_func(predictions: List, bboxes: List[np.ndarray], chart_json: json) ->
 
     Returns: score of the optimisation function
     """
-    # Text Loss is a metric that measures the readability of texts, ranges [0, 1]    
-    TXT_OCR = txt_loss(predictions[1], chart_json) * 256.
+    # Text loss is a metric that measures the readability of texts, ranges [0, 1]    
+    TXT_OCR = txt_loss(predictions[1], chart_json) * 512.
     # WAVE is a metric that measures how close the colors in the image are to the preferred colors from human [0, 1]
     WAVE = wave_metric(predictions[1]) * 256.
-    VD = vd_loss(predictions[2]) * 1024.
+    VD = vd_loss(predictions[2]) * 768.
     # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 8, which thresholds the whitespaces out)
     heatmap_mean = 0
     for bbox in bboxes:
@@ -77,10 +77,10 @@ def optim_func(predictions: List, bboxes: List[np.ndarray], chart_json: json) ->
         if bbox_heapmap[bbox_heapmap>8].size > 0:
             heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
     if len(bboxes) == 0:
-        return {"loss_max": WAVE + TXT_OCR - VD - 256}
+        return {"loss_max": (WAVE + TXT_OCR - VD - 256, 0)}
     # Overlap loss is a metric that penalise the too thick conditions: 0 for no overlap, 1 for overlap
     OVERLAP = overlap_loss(bboxes[0][3]-bboxes[0][1]-50, chart_json['vconcat'][0]['height'], len(chart_json['vconcat'][0]['data']['values'])) * 256.
-    return {"loss_max": WAVE + TXT_OCR + 4 * heatmap_mean / len(bboxes) - VD - OVERLAP}
+    return {"loss_max": (WAVE + TXT_OCR + 4 * heatmap_mean / len(bboxes) - VD - OVERLAP, 0)}
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
     max_iter = 50

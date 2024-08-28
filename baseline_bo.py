@@ -88,15 +88,13 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     )
 
     # Optimization loop
-    # best_iter = 0
     for i in range(max_iter):
         parameterization, trial_index = ax_client.get_next_trial()
-        bboxes = update_chart(chart_json, parameterization, annotation)
+        update_chart(chart_json, parameterization, annotation)
         ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func())
 
     best_parameters, values = ax_client.get_best_parameters()
     update_chart(chart_json, best_parameters, annotation, optim_path, chart_name)
-    # print('best iter appears at', best_iter, best_parameters, values)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

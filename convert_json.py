@@ -86,14 +86,14 @@ def write_tasks(annot_json: json, questions: List, input_path: str, base_path: s
                 elif v_type == 'v_bar':
                     ariaLabels.append(f"Entity: {highest_label}; value: {highest_value}")
 
-            if len(entities) > 0:
-                annot_json['tasks'].append({"question": q['query'], "labels": q_labels, "entity": entities, "aria-label": ariaLabels})
+        if len(entities) > 0:
+            annot_json['tasks'].append({"question": q['query'], "labels": q_labels, "entity": entities, "aria-label": ariaLabels})
 
-        if len(annot_json['tasks']) > 0:    
-            data_entries = sortby_value(data_entries, v_type) # sort h_bars
-            output_json['vconcat'][0]['data']['values'] = data_entries
-            output_json['name'] = filename
-            save_chart_batch(output_json, annot_json, input_path, output_path, filename.strip('.json'))
+    if len(annot_json['tasks']) > 0:    
+        data_entries = sortby_value(data_entries, v_type) # sort h_bars
+        output_json['vconcat'][0]['data']['values'] = data_entries
+        output_json['name'] = filename
+        save_chart_batch(output_json, annot_json, input_path, output_path, filename.strip('.json'))
 
 def process_json(input_path: str, subset: str, output_path: str, base_path: str):
     for i in trange(len(os.listdir(os.path.join(input_path, subset, 'annotations')))):

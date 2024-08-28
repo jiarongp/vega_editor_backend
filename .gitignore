@@ -3,4 +3,5 @@ __pycache__/
 *.tar
 data/*.png
 data/*.svg
+data/*.json
 data/optims

@@ -74,8 +74,7 @@ def write_text(im: np.ndarray, text: str):
 
 def update_chart(chart_json: json, params: dict, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
     # PARAMS: [aspect_ratio, font_size_axis, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b, axis_label_rotation(v_bar), orientation]
-    # change_orientation
-    chart_json, annotation = change_orientation(chart_json, annotation, params['x_ot'])
+    chart_json, annotation = change_orientation(chart_json, annotation, params['x_ot']) # change_orientation of the chart (horinzontal or vertical)
 
     chart_json['vconcat'][0]['height'] = chart_json['vconcat'][0]['width'] * calc_param('aspect_ratio', params['x0'])
     chart_json['vconcat'][0]['layer'][1]['mark']['fontSize'] = calc_param('font_size_mark', params['x2'])
@@ -112,19 +111,19 @@ def update_chart(chart_json: json, params: dict, annotation: json, data_path: st
     chart.save(f'{data_path}/{filename}.png')
     chart.save(f'{data_path}/{filename}.svg')
     im = Image.open(f'{data_path}/{filename}.png').convert("RGB")
-    im_grey = np.array(im.convert("L"))
-    im = np.array(im)
-    bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im))
+    im_np = np.array(im)
+    bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im_np))
 
     if not filename == 'chart':
         # print(filename)
         with open(f'{data_path}/{filename}.json', 'w') as out_file:
             json.dump(chart_json, out_file)
         for bbox in bboxes:
-            cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0), 2)
+            cv2.rectangle(im_np,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0), 2)
         # DEBUG: print visual density
-        # write_text(im, str(vd_loss(im_grey)))
-        cv2.imwrite(f'{data_path}/{filename}_bbox.png', im)
+        #im_grey = np.array(im.convert("L"))
+        # write_text(im_np, str(vd_loss(im_grey)))
+        cv2.imwrite(f'{data_path}/{filename}_bbox.png', im_np)
     return bboxes
 
 def save_chart_batch(chart_json: json, annotation: json, input_path: str, output_path: str, filename: str = 'chart'):    
