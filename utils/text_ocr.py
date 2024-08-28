@@ -1,4 +1,3 @@
-import os
 import json
 import argparse
 from PIL import Image
@@ -7,6 +6,7 @@ from pytesseract import pytesseract
 pytesseract.tesseract_cmd = r'/usr/bin/tesseract'
 
 def txt_loss(img: Image, chart_json: json) -> float:
+    img = img.resize((img.size[0] / 4, img.size[1] / 4)) # resize to 1/4 to make sure text are still readable
     ocr_all = pytesseract.image_to_string(img).lower()
     cnt = 0
     for entry in chart_json['vconcat'][0]['data']['values']:

@@ -9,16 +9,17 @@ from xml.dom import minidom
 import cv2
 from typing import List
 from PIL import Image
+from utils.visual_density import vd_loss
 
 PARAM_BOUNDS = {
     'aspect_ratio': [0.5, 2],
-    'font_size_axis': [15, 32],
-    'font_size_mark': [15, 32],
-    'bar_size': [20, 120],
+    'font_size_axis': [10, 32],
+    'font_size_mark': [10, 32],
+    'bar_size': [30, 150],
     'axis_label_rotation': [-90, -45, 0],
 }
 
-def calc_param(dict_key: str, param: float, is_discrete: bool = False):
+def calc_param(dict_key: str, param: float, is_discrete: bool = False) -> float:
     if is_discrete:
         return PARAM_BOUNDS[dict_key][int(param)]
     return PARAM_BOUNDS[dict_key][0] + (PARAM_BOUNDS[dict_key][1] - PARAM_BOUNDS[dict_key][0]) * param
@@ -54,6 +55,22 @@ def change_orientation(chart_json: json, annotation: json, ot: int) -> json:
                 parts = label.split(';')
                 annotation['tasks'][i]['aria-label'][j] = f"{parts[1].strip()}; {parts[0].strip()}"
         return chart_json, annotation
+
+def write_text(im: np.ndarray, text: str):
+    font                   = cv2.FONT_HERSHEY_SIMPLEX
+    bottomLeftCornerOfText = (20,20)
+    fontScale              = 1
+    fontColor              = (0,0,0)
+    thickness              = 1
+    lineType               = 2
+
+    cv2.putText(im, text, 
+        bottomLeftCornerOfText, 
+        font, 
+        fontScale,
+        fontColor,
+        thickness,
+        lineType)
 
 def update_chart(chart_json: json, params: dict, annotation: json, data_path: str = 'data', filename: str = 'chart') -> np.ndarray:
     # PARAMS: [aspect_ratio, font_size_axis, font_size_mark, bar_size, highlight_bar_color_r, highlight_bar_color_g, highlight_bar_color_b, axis_label_rotation(v_bar), orientation]
@@ -95,13 +112,18 @@ def update_chart(chart_json: json, params: dict, annotation: json, data_path: st
     chart.save(f'{data_path}/{filename}.png')
     chart.save(f'{data_path}/{filename}.svg')
     im = Image.open(f'{data_path}/{filename}.png').convert("RGB")
+    im_grey = np.array(im.convert("L"))
     im = np.array(im)
     bboxes = get_bboxes(f'{data_path}/{filename}.svg', annotation, np.shape(im))
-    if not filename == 'chart':
-        print(filename)
 
-    for bbox in bboxes:
-        cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0), 2)
+    if not filename == 'chart':
+        # print(filename)
+        with open(f'{data_path}/{filename}.json', 'w') as out_file:
+            json.dump(chart_json, out_file)
+        for bbox in bboxes:
+            cv2.rectangle(im,(bbox[0],bbox[1]),(bbox[2],bbox[3]),(0, 255, 0), 2)
+        # DEBUG: print visual density
+        # write_text(im, str(vd_loss(im_grey)))
         cv2.imwrite(f'{data_path}/{filename}_bbox.png', im)
     return bboxes
 
@@ -113,6 +135,7 @@ def save_chart_batch(chart_json: json, annotation: json, input_path: str, output
     with open(os.path.join(output_path, 'annotations', f'{filename}.json'), 'w') as out_file:
         json.dump(annotation, out_file)
     shutil.copy(os.path.join(input_path, 'png', filename+'.png'), os.path.join(output_path, 'png', filename+'.png'))
+    shutil.copy(os.path.join(input_path, 'tables', filename+'.csv'), os.path.join(output_path, 'tables', filename+'.csv'))
 
 def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarray]:
     xmldoc = minidom.parse(svg_file)
@@ -150,3 +173,9 @@ def get_bboxes(svg_file, annotation:json, imshape: np.ndarray) -> List[np.ndarra
 
     xmldoc.unlink()
     return bboxes
+
+def load_json(data_path: str, annot_path: str) -> List:
+    f = open(data_path)
+    f2 = open(annot_path)
+    # chart, annot
+    return json.load(f), json.load(f2)

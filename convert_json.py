@@ -52,12 +52,11 @@ def write_tasks(annot_json: json, questions: List, input_path: str, base_path: s
                     return
                 if not value: return
                 value = str(Decimal(value)).replace('.0','')
-                if value.find('0.') > -1:
+                if value.find('0.') > -1 or value.find('.') > -1:
                     if len(value) - value.find('.') > 2:
                         value = str(Decimal(value).quantize(Decimal('.01'))) # round up to 2 decimal places
-                elif value.find('.') > -1:
-                    if len(value) - value.find('.') > 1:
-                        value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
+                    #if len(value) - value.find('.') > 1:
+                    #    value = str(Decimal(value).quantize(Decimal('.1'))) # round up to 1 decimal places
                 if ii == 0:
                     data_entries.append({"Entity": x_label, "value": str(Decimal(value)).replace('.0','')})
 

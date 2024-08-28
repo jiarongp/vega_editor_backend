@@ -1,6 +1,11 @@
 {
   "$schema": "https://vega.github.io/schema/vega-lite/v5.json",
-  "config": {"view": {"continuousWidth": 600}},
+  "config": {"view": {"continuousWidth": 600},
+  "style": {
+    "cell": {
+      "stroke": "transparent"
+    }
+  }},
   "vconcat": [
     {
       "width": 600,
@@ -17,7 +22,7 @@
           "field": "Entity",
           "type": "ordinal",
           "sort": null,
-          "axis": {"grid": false, "labelFontSize": 17, "labelLimit": 0}
+          "axis": {"domain": false, "grid": false, "labelFontSize": 17, "labelLimit": 0}
         },
         "x": {
           "field": "value",

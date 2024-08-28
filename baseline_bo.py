@@ -1,18 +1,10 @@
 import os, sys
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import argparse
 import json
 import torch
 torch.manual_seed(42)
-from PIL import Image
 import numpy as np
-from typing import List
-from model.model import SalFormer
-from transformers import AutoImageProcessor, AutoTokenizer, BertModel, SwinModel
 from utils.utils import update_chart, load_json
-from utils.text_ocr import txt_loss
-from utils.visual_density import vd_loss, overlap_loss
-from utils.metrics import wave_metric
 
 from ax.service.ax_client import AxClient, ObjectiveProperties
 from ax.modelbridge.registry import Models
@@ -28,62 +20,19 @@ from botorch.models.gp_regression import SingleTaskGP
 from ax.modelbridge.generation_strategy import GenerationStep, GenerationStrategy
 
 
-def predict(ques: str) -> List:
-    """
-    Execute the prediction.
-
-    Args:
-        ques: a question string to feed into VisSalFormer
-
-    Returns: [list]
-        - heatmap from VisSalFormer (np.array)
-        - Average WAVE score across pixels (float, [0, 1))
-    """
-    image = Image.open('data/chart.png').convert("RGB")
-    img_pt = image_processor(image, return_tensors="pt").to(device)
-    inputs = tokenizer(ques, return_tensors="pt").to(device)
-
-    mask = model(img_pt['pixel_values'], inputs)
-    mask = mask.detach().cpu().squeeze().numpy()
-    heatmap = (mask * 255).astype(np.uint8)
-    im_grey = image.convert('L')
-
-    heatmap = np.resize(heatmap, (image.size[1], image.size[0]))
-    return [heatmap, image, np.array(im_grey)]
-
-
-def optim_func(predictions: List, bboxes: List[np.ndarray], chart_json: json) -> dict:
+def optim_func() -> dict:
     """
     Optimisation function of BO.
 
     Args:
-        predictions[list]: same as the output of predict()
-        predictions[0]: heatmap from VisSalFormer (np.array)
-        predictions[1]: original image (Image)
-        predictions[2]: gray image (np.array)
         bbox: bounding box coordinates
 
     Returns: score of the optimisation function
     """
-    # Text Loss is a metric that measures the readability of texts, ranges [0, 1]    
-    TXT_OCR = txt_loss(predictions[1], chart_json) * 256.
-    # WAVE is a metric that measures how close the colors in the image are to the preferred colors from human [0, 1]
-    WAVE = wave_metric(predictions[1]) * 256.
-    VD = vd_loss(predictions[2]) * 1024.
-    # heatmap_mean is the mean value of saliency maps in the bounding box (larger than 8, which thresholds the whitespaces out)
-    heatmap_mean = 0
-    for bbox in bboxes:
-        bbox_heapmap = predictions[0][bbox[1]:bbox[3], bbox[0]:bbox[2]]
-        if bbox_heapmap[bbox_heapmap>8].size > 0:
-            heatmap_mean += np.mean(bbox_heapmap[bbox_heapmap>8]) # thresholding the low salient pixels, so that the size of bounding box won't matter that much
-    if len(bboxes) == 0:
-        return {"loss_max": WAVE + TXT_OCR - VD - 256}
-    # Overlap loss is a metric that penalise the too thick conditions: 0 for no overlap, 1 for overlap
-    OVERLAP = overlap_loss(bboxes[0][3]-bboxes[0][1]-50, chart_json['vconcat'][0]['height'], len(chart_json['vconcat'][0]['data']['values'])) * 256.
-    return {"loss_max": WAVE + TXT_OCR + 4 * heatmap_mean / len(bboxes) - VD - OVERLAP}
+    return {"loss_max": np.random.normal(0, 1, 1)[0]}
 
 def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: str, chart_name:str):
-    max_iter = 50
+    max_iter = 20
     gs = GenerationStrategy(
         steps=[
             GenerationStep(  # Initialization step
@@ -143,8 +92,7 @@ def bayesian_optim(chart_json: json, annotation:json, query: str, optim_path: st
     for i in range(max_iter):
         parameterization, trial_index = ax_client.get_next_trial()
         bboxes = update_chart(chart_json, parameterization, annotation)
-        predictions = predict(query)
-        ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func(predictions, bboxes, chart_json))
+        ax_client.complete_trial(trial_index=trial_index, raw_data=optim_func())
 
     best_parameters, values = ax_client.get_best_parameters()
     update_chart(chart_json, best_parameters, annotation, optim_path, chart_name)
@@ -154,18 +102,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, default="./data/defaults/4488.json")
     parser.add_argument("--annot_path", type=str, default="./data/annotations/4488.json")
-    parser.add_argument("--optim_path", type=str, default="./data/optims")
+    parser.add_argument("--optim_path", type=str, default="./data/optims_randombaseline")
     args = vars(parser.parse_args())
-
-    device = 'cuda'
-    image_processor = AutoImageProcessor.from_pretrained("microsoft/swin-tiny-patch4-window7-224")
-    vit = SwinModel.from_pretrained("microsoft/swin-tiny-patch4-window7-224")
-    tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
-    bert = BertModel.from_pretrained("bert-base-uncased")
-    model = SalFormer(vit, bert).to(device)
-    checkpoint = torch.load('./model/model_lr6e-5_wd1e-4.tar')
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
 
     if '.json' in args['data_path']:
         chart_json, annot_json = load_json(args['data_path'], args['annot_path'])

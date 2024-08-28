@@ -8,10 +8,15 @@ def vd_loss(img_arr: np.ndarray) -> float:
     bg_ratio = img_arr[img_arr>253].size / img_arr.size
     M = 0.5956 # the average VD of ChartQA
     STD = 0.0926 #  the std VD of ChartQA
-    if bg_ratio < M + 3 * STD and bg_ratio > M - 3 * STD:
+    if bg_ratio < M + 2 * STD and bg_ratio > M - 2 * STD:
         return 0
     return np.abs(bg_ratio - M)
 
+# this is the loss to aviod overlaps of neighbor bars
+def overlap_loss(bandwidth: float, im_height: float, bar_num: int) -> float:
+    if bar_num * bandwidth > im_height:
+        return 1
+    return 0
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
